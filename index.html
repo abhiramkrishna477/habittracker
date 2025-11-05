@@ -1,0 +1,1409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HabitFlow - Habit Tracking & Daily Journal</title>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+    
+    <!-- Supabase JS -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <style>
+        :root {
+            --bg-primary: #1E1E1E;
+            --bg-secondary: #252525;
+            --bg-tertiary: #2D2D2D;
+            --text-primary: #FFFFFF;
+            --text-secondary: #A0A0A0;
+            --accent: #E84C3D;
+            --accent-hover: #D33A2B;
+            --border-color: #333333;
+            --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            --shadow-hover: 0 8px 15px rgba(0, 0, 0, 0.2);
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            transition: var(--transition);
+        }
+
+        .app-container {
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 260px;
+            background-color: var(--bg-secondary);
+            padding: 2rem 1.5rem;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid var(--border-color);
+            transition: var(--transition);
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 2.5rem;
+            font-weight: 700;
+            font-size: 1.5rem;
+        }
+
+        .logo i {
+            color: var(--accent);
+        }
+
+        .nav-menu {
+            list-style: none;
+            flex-grow: 1;
+        }
+
+        .nav-item {
+            margin-bottom: 0.5rem;
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem 1rem;
+            border-radius: 8px;
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: var(--transition);
+            cursor: pointer;
+        }
+
+        .nav-link:hover, .nav-link.active {
+            background-color: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .nav-link.active {
+            color: var(--accent);
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 2rem;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            font-weight: 700;
+        }
+
+        .date-display {
+            color: var(--text-secondary);
+            font-size: 1rem;
+        }
+
+        /* Dashboard Grid */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .card {
+            background-color: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: var(--shadow);
+            transition: var(--transition);
+        }
+
+        .card:hover {
+            box-shadow: var(--shadow-hover);
+            transform: translateY(-2px);
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .card-icon {
+            color: var(--accent);
+            font-size: 1.25rem;
+        }
+
+        /* Chart Container */
+        .chart-container {
+            height: 300px;
+            position: relative;
+        }
+
+        .chart-controls {
+            display: flex;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .chart-zoom-btn {
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+            background-color: var(--bg-tertiary);
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: var(--transition);
+            font-size: 0.875rem;
+        }
+
+        .chart-zoom-btn:hover {
+            background-color: var(--border-color);
+            color: var(--text-primary);
+        }
+
+        .chart-zoom-btn.active {
+            background-color: var(--accent);
+            color: white;
+            border-color: var(--accent);
+        }
+
+        /* Habit List */
+        .habit-list {
+            list-style: none;
+        }
+
+        .habit-item {
+            display: flex;
+            align-items: center;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 0.75rem;
+            background-color: var(--bg-tertiary);
+            transition: var(--transition);
+        }
+
+        .habit-item:hover {
+            background-color: var(--border-color);
+        }
+
+        .habit-checkbox {
+            width: 20px;
+            height: 20px;
+            margin-right: 1rem;
+            accent-color: var(--accent);
+            cursor: pointer;
+        }
+
+        .habit-name {
+            flex: 1;
+            font-weight: 500;
+        }
+
+        .habit-streak {
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        /* Add Habit Button */
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background-color: var(--accent);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: var(--accent-hover);
+            transform: translateY(-2px);
+        }
+
+        .btn-secondary {
+            background-color: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .btn-secondary:hover {
+            background-color: var(--border-color);
+        }
+
+        .btn-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background-color: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 2rem;
+            width: 90%;
+            max-width: 500px;
+            box-shadow: var(--shadow-hover);
+            animation: slideUp 0.3s ease;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .modal-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+        }
+
+        .close-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 1.5rem;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .close-btn:hover {
+            color: var(--text-primary);
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+        }
+
+        .form-input, .form-select, .form-textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+            background-color: var(--bg-tertiary);
+            color: var(--text-primary);
+            font-family: inherit;
+            transition: var(--transition);
+        }
+
+        .form-input:focus, .form-select:focus, .form-textarea:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .form-textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .form-checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .form-checkbox {
+            width: 20px;
+            height: 20px;
+            accent-color: var(--accent);
+        }
+
+        /* Calendar */
+        .calendar-container {
+            background-color: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: var(--shadow);
+        }
+
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .calendar-nav {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 0.5rem;
+        }
+
+        .calendar-day-header {
+            text-align: center;
+            font-weight: 600;
+            color: var(--text-secondary);
+            padding: 0.5rem;
+        }
+
+        .calendar-day {
+            aspect-ratio: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            background-color: var(--bg-tertiary);
+            cursor: pointer;
+            transition: var(--transition);
+            position: relative;
+        }
+
+        .calendar-day:hover {
+            background-color: var(--border-color);
+        }
+
+        .calendar-day.today {
+            border: 2px solid var(--accent);
+        }
+
+        .calendar-day.has-entry::after {
+            content: '✓';
+            position: absolute;
+            bottom: 5px;
+            right: 5px;
+            color: var(--accent);
+            font-size: 0.75rem;
+        }
+
+        .floating-btn {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            width: 56px;
+            height: 56px;
+            border-radius: 50%;
+            background-color: var(--accent);
+            color: white;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            box-shadow: var(--shadow-hover);
+            transition: var(--transition);
+            z-index: 100;
+        }
+
+        .floating-btn:hover {
+            background-color: var(--accent-hover);
+            transform: scale(1.1);
+        }
+
+        /* Analytics */
+        .analytics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-card {
+            background-color: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: var(--shadow);
+            text-align: center;
+            transition: var(--transition);
+        }
+
+        .stat-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-hover);
+        }
+
+        .stat-value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--accent);
+            margin-bottom: 0.5rem;
+        }
+
+        .stat-label {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        /* Toast Notification */
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background-color: var(--bg-tertiary);
+            color: var(--text-primary);
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            box-shadow: var(--shadow-hover);
+            opacity: 0;
+            transition: var(--transition);
+            z-index: 2000;
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .toast.error {
+            background-color: var(--accent);
+        }
+
+        /* Loading Spinner */
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid var(--border-color);
+            border-radius: 50%;
+            border-top-color: var(--accent);
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Debug Panel */
+        .debug-panel {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background-color: var(--bg-tertiary);
+            padding: 10px;
+            border-radius: 8px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            max-width: 300px;
+            z-index: 9999;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .sidebar {
+                position: fixed;
+                left: -260px;
+                z-index: 999;
+                height: 100%;
+            }
+
+            .sidebar.active {
+                left: 0;
+            }
+
+            .main-content {
+                padding: 1rem;
+            }
+
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .analytics-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="logo">
+                <i class="fas fa-check-circle"></i>
+                <span>HabitFlow</span>
+            </div>
+            
+            <nav>
+                <ul class="nav-menu">
+                    <li class="nav-item">
+                        <a href="#" class="nav-link active" data-page="dashboard">
+                            <i class="fas fa-home"></i>
+                            <span>Dashboard</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link" data-page="habits">
+                            <i class="fas fa-tasks"></i>
+                            <span>Habits</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link" data-page="calendar">
+                            <i class="fas fa-calendar-alt"></i>
+                            <span>Calendar</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link" data-page="settings">
+                            <i class="fas fa-cog"></i>
+                            <span>Settings</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+        </aside>
+        
+        <!-- Main Content -->
+        <main class="main-content">
+            <header class="header">
+                <h1>Dashboard</h1>
+                <div class="date-display" id="dateDisplay"></div>
+            </header>
+            
+            <!-- Analytics Section -->
+            <div class="analytics-grid">
+                <div class="stat-card">
+                    <div class="stat-value" id="completionRate">0%</div>
+                    <div class="stat-label">Completion Rate This Week</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="streakCounter">🔥 0</div>
+                    <div class="stat-label">Day Streak</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="totalHabits">0</div>
+                    <div class="stat-label">Total Habits</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="avgHabits">0</div>
+                    <div class="stat-label">Avg. Habits/Day</div>
+                </div>
+            </div>
+            
+            <!-- Dashboard Grid -->
+            <div class="dashboard-grid">
+                <!-- Progress Chart -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Habits Progress</h2>
+                        <i class="fas fa-chart-line card-icon"></i>
+                    </div>
+                    <div class="chart-controls">
+                        <button class="chart-zoom-btn active" data-range="week">Week</button>
+                        <button class="chart-zoom-btn" data-range="month">Month</button>
+                        <button class="chart-zoom-btn" data-range="year">Year</button>
+                        <button class="chart-zoom-btn" data-range="all">All Time</button>
+                    </div>
+                    <div class="chart-container">
+                        <canvas id="progressChart"></canvas>
+                    </div>
+                </div>
+                
+                <!-- Daily Journal -->
+                <div class="card">
+                    <div class="card-header">
+                        <h2 class="card-title">Daily Journal</h2>
+                        <button class="btn btn-primary" id="addHabitBtn">
+                            <i class="fas fa-plus"></i>
+                            Add Habit
+                        </button>
+                    </div>
+                    <ul class="habit-list" id="habitList">
+                        <!-- Habits will be loaded from Supabase -->
+                    </ul>
+                </div>
+            </div>
+            
+            <!-- Calendar Section -->
+            <div class="calendar-container">
+                <div class="calendar-header">
+                    <h2 class="card-title">Journal Calendar</h2>
+                    <div class="calendar-nav">
+                        <button class="btn btn-icon btn-secondary" id="prevMonth">
+                            <i class="fas fa-chevron-left"></i>
+                        </button>
+                        <span id="currentMonth"></span>
+                        <button class="btn btn-icon btn-secondary" id="nextMonth">
+                            <i class="fas fa-chevron-right"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="calendar-grid" id="calendarGrid">
+                    <!-- Calendar will be generated by JavaScript -->
+                </div>
+            </div>
+        </main>
+        
+        <!-- Floating Add Button -->
+        <button class="floating-btn" id="floatingAddBtn">
+            <i class="fas fa-plus"></i>
+        </button>
+    </div>
+    
+    <!-- Add Habit Modal -->
+    <div class="modal" id="addHabitModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Add New Habit</h2>
+                <button class="close-btn" id="closeModalBtn">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="addHabitForm">
+                <div class="form-group">
+                    <label class="form-label" for="habitName">Habit Name</label>
+                    <input type="text" class="form-input" id="habitName" placeholder="e.g., Read for 30 minutes" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="habitDescription">Description (Optional)</label>
+                    <textarea class="form-textarea" id="habitDescription" placeholder="Add notes about this habit..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label class="form-label" for="habitFrequency">Frequency</label>
+                    <select class="form-select" id="habitFrequency">
+                        <option value="daily">Daily</option>
+                        <option value="weekly">Weekly</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <div class="form-checkbox-group">
+                        <input type="checkbox" class="form-checkbox" id="habitActive" checked>
+                        <label class="form-label" for="habitActive">Active</label>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <button type="submit" class="btn btn-primary" style="width: 100%;">
+                        <i class="fas fa-save"></i>
+                        Save Habit
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Toast Notification -->
+    <div class="toast" id="toast"></div>
+    
+    <!-- Debug Panel -->
+    <div class="debug-panel" id="debugPanel" style="display: none;">
+        <div>Connection: <span id="debugConnection">Checking...</span></div>
+        <div>Habits: <span id="debugHabits">0</span></div>
+        <div>Entries: <span id="debugEntries">0</span></div>
+    </div>
+    
+    <script>
+        // Initialize Supabase with your credentials
+        const supabaseUrl = 'https://jtpsnufycomhozsiegjh.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp0cHNudWZ5Y29taG96c2llZ2poIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE5OTI5NjAsImV4cCI6MjA3NzU2ODk2MH0.SsKcUAjkv4gsTKawOfN-KKzYRkUKoQZj-JZDo8liggc';
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+        
+        // DOM Elements
+        const addHabitBtn = document.getElementById('addHabitBtn');
+        const floatingAddBtn = document.getElementById('floatingAddBtn');
+        const addHabitModal = document.getElementById('addHabitModal');
+        const closeModalBtn = document.getElementById('closeModalBtn');
+        const addHabitForm = document.getElementById('addHabitForm');
+        const habitList = document.getElementById('habitList');
+        const dateDisplay = document.getElementById('dateDisplay');
+        const calendarGrid = document.getElementById('calendarGrid');
+        const currentMonth = document.getElementById('currentMonth');
+        const prevMonth = document.getElementById('prevMonth');
+        const nextMonth = document.getElementById('nextMonth');
+        const navLinks = document.querySelectorAll('.nav-link');
+        const toast = document.getElementById('toast');
+        const chartZoomBtns = document.querySelectorAll('.chart-zoom-btn');
+        
+        // Debug elements
+        const debugPanel = document.getElementById('debugPanel');
+        const debugConnection = document.getElementById('debugConnection');
+        const debugHabits = document.getElementById('debugHabits');
+        const debugEntries = document.getElementById('debugEntries');
+        
+        // State
+        let currentDate = new Date();
+        let currentMonthDate = new Date();
+        let habits = [];
+        let habitEntries = [];
+        let progressChart = null;
+        let currentZoomRange = 'week';
+        let isConnected = false;
+        
+        // Initialize
+        document.addEventListener('DOMContentLoaded', async () => {
+            updateDateDisplay();
+            renderCalendar();
+            await testConnection();
+            await loadData();
+            setupEventListeners();
+            setupRealtimeSubscription();
+            
+            // Show debug panel (remove this in production)
+            debugPanel.style.display = 'block';
+        });
+        
+        // Test Supabase connection
+        async function testConnection() {
+            try {
+                const { data, error } = await supabase.from('habits').select('count');
+                if (error) throw error;
+                isConnected = true;
+                debugConnection.textContent = 'Connected ✓';
+                debugConnection.style.color = '#4CAF50';
+            } catch (error) {
+                isConnected = false;
+                debugConnection.textContent = 'Error ✗';
+                debugConnection.style.color = '#E84C3D';
+                console.error('Connection error:', error);
+                showToast('Failed to connect to database', 'error');
+            }
+        }
+        
+        // Load data from Supabase
+        async function loadData() {
+            if (!isConnected) {
+                showToast('Database not connected', 'error');
+                return;
+            }
+            
+            try {
+                // Load habits
+                const { data: habitsData, error: habitsError } = await supabase
+                    .from('habits')
+                    .select('*')
+                    .eq('active', true);
+                
+                if (habitsError) throw habitsError;
+                habits = habitsData || [];
+                debugHabits.textContent = habits.length;
+                
+                // Load habit entries
+                const { data: entriesData, error: entriesError } = await supabase
+                    .from('habit_entries')
+                    .select('*')
+                    .order('date', { ascending: true });
+                
+                if (entriesError) throw entriesError;
+                habitEntries = entriesData || [];
+                debugEntries.textContent = habitEntries.length;
+                
+                renderHabits();
+                updateAnalytics();
+                updateProgressChart();
+                renderCalendar();
+                
+            } catch (error) {
+                console.error('Error loading data:', error);
+                showToast('Error loading data: ' + error.message, 'error');
+            }
+        }
+        
+        // Setup real-time subscription
+        function setupRealtimeSubscription() {
+            if (!isConnected) return;
+            
+            // Listen for habit changes
+            supabase
+                .channel('habits')
+                .on('postgres_changes', 
+                    { event: '*', schema: 'public', table: 'habits' },
+                    (payload) => {
+                        console.log('Habit change:', payload);
+                        loadData();
+                    }
+                )
+                .subscribe();
+            
+            // Listen for habit entry changes
+            supabase
+                .channel('habit_entries')
+                .on('postgres_changes', 
+                    { event: '*', schema: 'public', table: 'habit_entries' },
+                    (payload) => {
+                        console.log('Habit entry change:', payload);
+                        loadData();
+                    }
+                )
+                .subscribe();
+        }
+        
+        // Update date display
+        function updateDateDisplay() {
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            dateDisplay.textContent = currentDate.toLocaleDateString('en-US', options);
+        }
+        
+        // Navigation
+        navLinks.forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                navLinks.forEach(l => l.classList.remove('active'));
+                link.classList.add('active');
+                
+                const page = link.getAttribute('data-page');
+                console.log(`Navigating to ${page}`);
+            });
+        });
+        
+        // Modal controls
+        addHabitBtn.addEventListener('click', () => {
+            addHabitModal.classList.add('active');
+        });
+        
+        floatingAddBtn.addEventListener('click', () => {
+            addHabitModal.classList.add('active');
+        });
+        
+        closeModalBtn.addEventListener('click', () => {
+            addHabitModal.classList.remove('active');
+        });
+        
+        addHabitModal.addEventListener('click', (e) => {
+            if (e.target === addHabitModal) {
+                addHabitModal.classList.remove('active');
+            }
+        });
+        
+        // Add habit form
+        addHabitForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            if (!isConnected) {
+                showToast('Database not connected', 'error');
+                return;
+            }
+            
+            const habitName = document.getElementById('habitName').value;
+            const habitDescription = document.getElementById('habitDescription').value;
+            const habitFrequency = document.getElementById('habitFrequency').value;
+            const habitActive = document.getElementById('habitActive').checked;
+            
+            try {
+                const { data, error } = await supabase
+                    .from('habits')
+                    .insert([{
+                        name: habitName,
+                        description: habitDescription,
+                        frequency: habitFrequency,
+                        active: habitActive,
+                        created_at: new Date().toISOString()
+                    }])
+                    .select();
+                
+                if (error) throw error;
+                
+                showToast('Habit added successfully!');
+                addHabitForm.reset();
+                addHabitModal.classList.remove('active');
+                
+                // Add initial entry for today
+                const today = new Date().toISOString().split('T')[0];
+                await supabase
+                    .from('habit_entries')
+                    .insert([{
+                        habit_id: data[0].id,
+                        date: today,
+                        completed: false,
+                        created_at: new Date().toISOString()
+                    }]);
+                
+                await loadData();
+            } catch (error) {
+                console.error('Error adding habit:', error);
+                showToast('Error adding habit: ' + error.message, 'error');
+            }
+        });
+        
+        // Render habits
+        function renderHabits() {
+            habitList.innerHTML = '';
+            
+            if (habits.length === 0) {
+                habitList.innerHTML = '<li style="text-align: center; color: var(--text-secondary); padding: 2rem;">No habits yet. Add your first habit!</li>';
+                document.getElementById('totalHabits').textContent = '0';
+                return;
+            }
+            
+            habits.forEach(habit => {
+                const habitItem = document.createElement('li');
+                habitItem.className = 'habit-item';
+                
+                const today = new Date().toISOString().split('T')[0];
+                const todayEntry = habitEntries.find(entry => 
+                    entry.habit_id === habit.id && entry.date === today
+                );
+                
+                const isCompletedToday = todayEntry ? todayEntry.completed : false;
+                
+                habitItem.innerHTML = `
+                    <input type="checkbox" class="habit-checkbox" ${isCompletedToday ? 'checked' : ''} data-habit-id="${habit.id}">
+                    <span class="habit-name">${habit.name}</span>
+                    <span class="habit-streak">
+                        <i class="fas fa-fire"></i> ${calculateStreak(habit.id)}
+                    </span>
+                `;
+                
+                const checkbox = habitItem.querySelector('.habit-checkbox');
+                checkbox.addEventListener('change', async () => {
+                    await toggleHabitCompletion(habit.id, checkbox.checked);
+                });
+                
+                habitList.appendChild(habitItem);
+            });
+            
+            document.getElementById('totalHabits').textContent = habits.length;
+        }
+        
+        // Toggle habit completion
+        async function toggleHabitCompletion(habitId, completed) {
+            if (!isConnected) {
+                showToast('Database not connected', 'error');
+                return;
+            }
+            
+            const today = new Date().toISOString().split('T')[0];
+            
+            try {
+                // First, try to find existing entry
+                const { data: existingEntry, error: fetchError } = await supabase
+                    .from('habit_entries')
+                    .select('*')
+                    .eq('habit_id', habitId)
+                    .eq('date', today)
+                    .single();
+                
+                if (fetchError && fetchError.code !== 'PGRST116') {
+                    throw fetchError;
+                }
+                
+                let result;
+                if (existingEntry) {
+                    // Update existing entry
+                    result = await supabase
+                        .from('habit_entries')
+                        .update({
+                            completed: completed,
+                            updated_at: new Date().toISOString()
+                        })
+                        .eq('id', existingEntry.id);
+                } else {
+                    // Create new entry
+                    result = await supabase
+                        .from('habit_entries')
+                        .insert([{
+                            habit_id: habitId,
+                            date: today,
+                            completed: completed,
+                            created_at: new Date().toISOString()
+                        }]);
+                }
+                
+                if (result.error) throw result.error;
+                
+                showToast(completed ? 'Habit marked as complete!' : 'Habit marked as incomplete');
+                
+                // Reload data to update all UI components
+                await loadData();
+                
+            } catch (error) {
+                console.error('Error updating habit:', error);
+                showToast('Error updating habit: ' + error.message, 'error');
+                
+                // Revert checkbox state on error
+                const checkbox = document.querySelector(`[data-habit-id="${habitId}"]`);
+                if (checkbox) {
+                    checkbox.checked = !completed;
+                }
+            }
+        }
+        
+        // Calculate streak
+        function calculateStreak(habitId) {
+            const entries = habitEntries
+                .filter(entry => entry.habit_id === habitId && entry.completed)
+                .sort((a, b) => new Date(b.date) - new Date(a.date));
+            
+            if (entries.length === 0) return 0;
+            
+            let streak = 0;
+            let currentDate = new Date();
+            currentDate.setHours(0, 0, 0, 0);
+            
+            for (const entry of entries) {
+                const entryDate = new Date(entry.date);
+                entryDate.setHours(0, 0, 0, 0);
+                
+                const diffDays = Math.floor((currentDate - entryDate) / (1000 * 60 * 60 * 24));
+                
+                if (diffDays === streak) {
+                    streak++;
+                } else {
+                    break;
+                }
+            }
+            
+            return streak;
+        }
+        
+        // Update analytics
+        function updateAnalytics() {
+            // Calculate completion rate for this week
+            const today = new Date();
+            const weekStart = new Date(today);
+            weekStart.setDate(today.getDate() - today.getDay());
+            weekStart.setHours(0, 0, 0, 0);
+            
+            const weekEntries = habitEntries.filter(entry => {
+                const entryDate = new Date(entry.date);
+                return entryDate >= weekStart && entry.completed;
+            });
+            
+            const totalPossible = habits.length * 7;
+            const completed = weekEntries.length;
+            const completionRate = totalPossible > 0 ? Math.round((completed / totalPossible) * 100) : 0;
+            
+            document.getElementById('completionRate').textContent = `${completionRate}%`;
+            
+            // Calculate overall streak
+            const allStreaks = habits.map(habit => calculateStreak(habit.id));
+            const maxStreak = Math.max(...allStreaks, 0);
+            document.getElementById('streakCounter').textContent = `🔥 ${maxStreak}`;
+            
+            // Calculate average habits per day
+            const uniqueDays = [...new Set(habitEntries.map(e => e.date))].length;
+            const avgHabits = uniqueDays > 0 
+                ? (habitEntries.filter(e => e.completed).length / uniqueDays).toFixed(1)
+                : 0;
+            document.getElementById('avgHabits').textContent = avgHabits;
+        }
+        
+        // Update progress chart
+        function updateProgressChart() {
+            const ctx = document.getElementById('progressChart').getContext('2d');
+            
+            // Prepare data based on zoom range
+            const { labels, data } = prepareChartData(currentZoomRange);
+            
+            if (progressChart) {
+                progressChart.destroy();
+            }
+            
+            const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+            gradient.addColorStop(0, 'rgba(232, 76, 61, 0.5)');
+            gradient.addColorStop(1, 'rgba(232, 76, 61, 0)');
+            
+            progressChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Habits Completed',
+                        data: data,
+                        borderColor: '#E84C3D',
+                        backgroundColor: gradient,
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4,
+                        pointBackgroundColor: '#E84C3D',
+                        pointBorderColor: '#fff',
+                        pointBorderWidth: 2,
+                        pointRadius: 5,
+                        pointHoverRadius: 7
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    },
+                    plugins: {
+                        legend: {
+                            display: false
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(30, 30, 30, 0.8)',
+                            titleColor: '#fff',
+                            bodyColor: '#fff',
+                            borderColor: '#E84C3D',
+                            borderWidth: 1,
+                            padding: 10,
+                            displayColors: false,
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.parsed.y} habits completed`;
+                                }
+                            }
+                        },
+                        zoom: {
+                            zoom: {
+                                wheel: {
+                                    enabled: true,
+                                },
+                                pinch: {
+                                    enabled: true
+                                },
+                                mode: 'x',
+                            },
+                            pan: {
+                                enabled: true,
+                                mode: 'x',
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            grid: {
+                                display: false
+                            },
+                            ticks: {
+                                color: '#A0A0A0'
+                            }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.05)'
+                            },
+                            ticks: {
+                                color: '#A0A0A0',
+                                stepSize: 1
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // Prepare chart data based on range
+        function prepareChartData(range) {
+            const today = new Date();
+            const labels = [];
+            const data = [];
+            
+            let startDate = new Date(today);
+            
+            switch (range) {
+                case 'week':
+                    startDate.setDate(today.getDate() - 7);
+                    break;
+                case 'month':
+                    startDate.setMonth(today.getMonth() - 1);
+                    break;
+                case 'year':
+                    startDate.setFullYear(today.getFullYear() - 1);
+                    break;
+                case 'all':
+                    if (habitEntries.length > 0) {
+                        const firstEntry = new Date(habitEntries[0].date);
+                        startDate = firstEntry;
+                    } else {
+                        startDate.setFullYear(today.getFullYear() - 1);
+                    }
+                    break;
+            }
+            
+            // Generate data points
+            const current = new Date(startDate);
+            while (current <= today) {
+                const dateStr = current.toISOString().split('T')[0];
+                const completedCount = habitEntries.filter(entry => 
+                    entry.date === dateStr && entry.completed
+                ).length;
+                
+                labels.push(current.toLocaleDateString('en-US', { 
+                    month: 'short', 
+                    day: 'numeric',
+                    year: range === 'all' && current.getMonth() === 0 ? 'numeric' : undefined
+                }));
+                data.push(completedCount);
+                
+                // Increment based on range
+                if (range === 'week' || range === 'month') {
+                    current.setDate(current.getDate() + 1);
+                } else if (range === 'year') {
+                    current.setMonth(current.getMonth() + 1);
+                } else {
+                    current.setDate(current.getDate() + 7);
+                }
+            }
+            
+            return { labels, data };
+        }
+        
+        // Chart zoom controls
+        chartZoomBtns.forEach(btn => {
+            btn.addEventListener('click', () => {
+                chartZoomBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentZoomRange = btn.getAttribute('data-range');
+                updateProgressChart();
+            });
+        });
+        
+        // Calendar functions
+        function renderCalendar() {
+            const year = currentMonthDate.getFullYear();
+            const month = currentMonthDate.getMonth();
+            
+            currentMonth.textContent = new Date(year, month).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+            
+            calendarGrid.innerHTML = '';
+            
+            const dayHeaders = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            dayHeaders.forEach(day => {
+                const dayHeader = document.createElement('div');
+                dayHeader.className = 'calendar-day-header';
+                dayHeader.textContent = day;
+                calendarGrid.appendChild(dayHeader);
+            });
+            
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            
+            for (let i = 0; i < firstDay; i++) {
+                const emptyDay = document.createElement('div');
+                calendarGrid.appendChild(emptyDay);
+            }
+            
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dayElement = document.createElement('div');
+                dayElement.className = 'calendar-day';
+                dayElement.textContent = day;
+                
+                const today = new Date();
+                if (year === today.getFullYear() && month === today.getMonth() && day === today.getDate()) {
+                    dayElement.classList.add('today');
+                }
+                
+                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                const hasEntry = habitEntries.some(entry => entry.date === dateStr && entry.completed);
+                if (hasEntry) {
+                    dayElement.classList.add('has-entry');
+                }
+                
+                dayElement.addEventListener('click', () => {
+                    console.log(`Viewing journal for ${dateStr}`);
+                });
+                
+                calendarGrid.appendChild(dayElement);
+            }
+        }
+        
+        // Calendar navigation
+        prevMonth.addEventListener('click', () => {
+            currentMonthDate.setMonth(currentMonthDate.getMonth() - 1);
+            renderCalendar();
+        });
+        
+        nextMonth.addEventListener('click', () => {
+            currentMonthDate.setMonth(currentMonthDate.getMonth() + 1);
+            renderCalendar();
+        });
+        
+        // Toast notification
+        function showToast(message, type = 'success') {
+            toast.textContent = message;
+            toast.className = 'toast show';
+            
+            if (type === 'error') {
+                toast.classList.add('error');
+            }
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+        
+        // Setup additional event listeners
+        function setupEventListeners() {
+            // Window resize handler
+            window.addEventListener('resize', () => {
+                if (window.innerWidth > 768) {
+                    document.getElementById('sidebar').classList.remove('active');
+                }
+            });
+        }
+    </script>
+</body>
+</html>
