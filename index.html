@@ -27,8 +27,8 @@
             --bg-tertiary: #2D2D2D;
             --text-primary: #FFFFFF;
             --text-secondary: #A0A0A0;
-            --accent: #E84C3D;
-            --accent-hover: #D33A2B;
+            --accent: #4CAF50;
+            --accent-hover: #45a049;
             --border-color: #333333;
             --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             --shadow-hover: 0 8px 15px rgba(0, 0, 0, 0.2);
@@ -457,6 +457,11 @@
             font-size: 0.75rem;
         }
 
+        .calendar-day.selected {
+            background-color: var(--accent);
+            color: white;
+        }
+
         .floating-btn {
             position: fixed;
             bottom: 2rem;
@@ -682,7 +687,7 @@
                 <!-- Daily Journal -->
                 <div class="card">
                     <div class="card-header">
-                        <h2 class="card-title">Daily Journal</h2>
+                        <h2 class="card-title" id="journalTitle">Today's Habits</h2>
                         <button class="btn btn-primary" id="addHabitBtn">
                             <i class="fas fa-plus"></i>
                             Add Habit
@@ -785,6 +790,7 @@
         const addHabitForm = document.getElementById('addHabitForm');
         const habitList = document.getElementById('habitList');
         const dateDisplay = document.getElementById('dateDisplay');
+        const journalTitle = document.getElementById('journalTitle');
         const calendarGrid = document.getElementById('calendarGrid');
         const currentMonth = document.getElementById('currentMonth');
         const prevMonth = document.getElementById('prevMonth');
@@ -802,6 +808,7 @@
         // State
         let currentDate = new Date();
         let currentMonthDate = new Date();
+        let selectedDate = new Date(); // New state for selected date
         let habits = [];
         let habitEntries = [];
         let progressChart = null;
@@ -832,7 +839,7 @@
             } catch (error) {
                 isConnected = false;
                 debugConnection.textContent = 'Error ✗';
-                debugConnection.style.color = '#E84C3D';
+                debugConnection.style.color = '#4CAF50';
                 console.error('Connection error:', error);
                 showToast('Failed to connect to database', 'error');
             }
@@ -910,6 +917,21 @@
         function updateDateDisplay() {
             const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
             dateDisplay.textContent = currentDate.toLocaleDateString('en-US', options);
+            
+            // Update journal title based on selected date
+            if (isToday(selectedDate)) {
+                journalTitle.textContent = "Today's Habits";
+            } else {
+                journalTitle.textContent = `Habits for ${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`;
+            }
+        }
+        
+        // Check if date is today
+        function isToday(date) {
+            const today = new Date();
+            return date.getDate() === today.getDate() &&
+                   date.getMonth() === today.getMonth() &&
+                   date.getFullYear() === today.getFullYear();
         }
         
         // Navigation
@@ -1003,19 +1025,20 @@
                 return;
             }
             
+            const selectedDateStr = selectedDate.toISOString().split('T')[0];
+            
             habits.forEach(habit => {
                 const habitItem = document.createElement('li');
                 habitItem.className = 'habit-item';
                 
-                const today = new Date().toISOString().split('T')[0];
-                const todayEntry = habitEntries.find(entry => 
-                    entry.habit_id === habit.id && entry.date === today
+                const entry = habitEntries.find(entry => 
+                    entry.habit_id === habit.id && entry.date === selectedDateStr
                 );
                 
-                const isCompletedToday = todayEntry ? todayEntry.completed : false;
+                const isCompleted = entry ? entry.completed : false;
                 
                 habitItem.innerHTML = `
-                    <input type="checkbox" class="habit-checkbox" ${isCompletedToday ? 'checked' : ''} data-habit-id="${habit.id}">
+                    <input type="checkbox" class="habit-checkbox" ${isCompleted ? 'checked' : ''} data-habit-id="${habit.id}">
                     <span class="habit-name">${habit.name}</span>
                     <span class="habit-streak">
                         <i class="fas fa-fire"></i> ${calculateStreak(habit.id)}
@@ -1024,7 +1047,7 @@
                 
                 const checkbox = habitItem.querySelector('.habit-checkbox');
                 checkbox.addEventListener('change', async () => {
-                    await toggleHabitCompletion(habit.id, checkbox.checked);
+                    await toggleHabitCompletion(habit.id, checkbox.checked, selectedDateStr);
                 });
                 
                 habitList.appendChild(habitItem);
@@ -1034,13 +1057,11 @@
         }
         
         // Toggle habit completion
-        async function toggleHabitCompletion(habitId, completed) {
+        async function toggleHabitCompletion(habitId, completed, date) {
             if (!isConnected) {
                 showToast('Database not connected', 'error');
                 return;
             }
-            
-            const today = new Date().toISOString().split('T')[0];
             
             try {
                 // First, try to find existing entry
@@ -1048,7 +1069,7 @@
                     .from('habit_entries')
                     .select('*')
                     .eq('habit_id', habitId)
-                    .eq('date', today)
+                    .eq('date', date)
                     .single();
                 
                 if (fetchError && fetchError.code !== 'PGRST116') {
@@ -1071,7 +1092,7 @@
                         .from('habit_entries')
                         .insert([{
                             habit_id: habitId,
-                            date: today,
+                            date: date,
                             completed: completed,
                             created_at: new Date().toISOString()
                         }]);
@@ -1168,8 +1189,8 @@
             }
             
             const gradient = ctx.createLinearGradient(0, 0, 0, 300);
-            gradient.addColorStop(0, 'rgba(232, 76, 61, 0.5)');
-            gradient.addColorStop(1, 'rgba(232, 76, 61, 0)');
+            gradient.addColorStop(0, 'rgba(76, 175, 80, 0.5)');
+            gradient.addColorStop(1, 'rgba(76, 175, 80, 0)');
             
             progressChart = new Chart(ctx, {
                 type: 'line',
@@ -1178,12 +1199,12 @@
                     datasets: [{
                         label: 'Habits Completed',
                         data: data,
-                        borderColor: '#E84C3D',
+                        borderColor: '#4CAF50',
                         backgroundColor: gradient,
                         borderWidth: 3,
                         fill: true,
                         tension: 0.4,
-                        pointBackgroundColor: '#E84C3D',
+                        pointBackgroundColor: '#4CAF50',
                         pointBorderColor: '#fff',
                         pointBorderWidth: 2,
                         pointRadius: 5,
@@ -1205,7 +1226,7 @@
                             backgroundColor: 'rgba(30, 30, 30, 0.8)',
                             titleColor: '#fff',
                             bodyColor: '#fff',
-                            borderColor: '#E84C3D',
+                            borderColor: '#4CAF50',
                             borderWidth: 1,
                             padding: 10,
                             displayColors: false,
@@ -1258,6 +1279,7 @@
         // Prepare chart data based on range
         function prepareChartData(range) {
             const today = new Date();
+            today.setHours(0, 0, 0, 0); // Normalize to start of day
             const labels = [];
             const data = [];
             
@@ -1265,7 +1287,7 @@
             
             switch (range) {
                 case 'week':
-                    startDate.setDate(today.getDate() - 7);
+                    startDate.setDate(today.getDate() - 6); // Include today (7 days total)
                     break;
                 case 'month':
                     startDate.setMonth(today.getMonth() - 1);
@@ -1285,17 +1307,35 @@
             
             // Generate data points
             const current = new Date(startDate);
+            current.setHours(0, 0, 0, 0); // Normalize to start of day
+            
             while (current <= today) {
                 const dateStr = current.toISOString().split('T')[0];
                 const completedCount = habitEntries.filter(entry => 
                     entry.date === dateStr && entry.completed
                 ).length;
                 
-                labels.push(current.toLocaleDateString('en-US', { 
-                    month: 'short', 
-                    day: 'numeric',
-                    year: range === 'all' && current.getMonth() === 0 ? 'numeric' : undefined
-                }));
+                // Format label based on range
+                let label;
+                if (range === 'week' || range === 'month') {
+                    label = current.toLocaleDateString('en-US', { 
+                        month: 'short', 
+                        day: 'numeric'
+                    });
+                } else if (range === 'year') {
+                    label = current.toLocaleDateString('en-US', { 
+                        month: 'short', 
+                        day: 'numeric'
+                    });
+                } else {
+                    label = current.toLocaleDateString('en-US', { 
+                        month: 'short', 
+                        day: 'numeric',
+                        year: current.getMonth() === 0 && current.getDate() === 1 ? 'numeric' : undefined
+                    });
+                }
+                
+                labels.push(label);
                 data.push(completedCount);
                 
                 // Increment based on range
@@ -1356,6 +1396,13 @@
                     dayElement.classList.add('today');
                 }
                 
+                // Check if this day is the selected date
+                if (year === selectedDate.getFullYear() && 
+                    month === selectedDate.getMonth() && 
+                    day === selectedDate.getDate()) {
+                    dayElement.classList.add('selected');
+                }
+                
                 const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                 const hasEntry = habitEntries.some(entry => entry.date === dateStr && entry.completed);
                 if (hasEntry) {
@@ -1363,6 +1410,18 @@
                 }
                 
                 dayElement.addEventListener('click', () => {
+                    // Update selected date
+                    selectedDate = new Date(year, month, day);
+                    
+                    // Re-render calendar to update selected state
+                    renderCalendar();
+                    
+                    // Update date display and journal title
+                    updateDateDisplay();
+                    
+                    // Re-render habits for the selected date
+                    renderHabits();
+                    
                     console.log(`Viewing journal for ${dateStr}`);
                 });
                 
