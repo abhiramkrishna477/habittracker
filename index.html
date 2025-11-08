@@ -29,6 +29,8 @@
             --text-secondary: #A0A0A0;
             --accent: #4CAF50;
             --accent-hover: #45a049;
+            --danger: #f44336;
+            --danger-hover: #d32f2f;
             --border-color: #333333;
             --shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
             --shadow-hover: 0 8px 15px rgba(0, 0, 0, 0.2);
@@ -218,6 +220,7 @@
             margin-bottom: 0.75rem;
             background-color: var(--bg-tertiary);
             transition: var(--transition);
+            position: relative;
         }
 
         .habit-item:hover {
@@ -243,6 +246,44 @@
             gap: 0.25rem;
             color: var(--text-secondary);
             font-size: 0.875rem;
+            margin-right: 1rem;
+        }
+
+        .habit-actions {
+            display: flex;
+            gap: 0.5rem;
+            opacity: 0;
+            transition: var(--transition);
+        }
+
+        .habit-item:hover .habit-actions {
+            opacity: 1;
+        }
+
+        .habit-action-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+            border: none;
+            background-color: transparent;
+            color: var(--text-secondary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+        }
+
+        .habit-action-btn:hover {
+            background-color: var(--bg-secondary);
+        }
+
+        .habit-action-btn.edit:hover {
+            color: var(--accent);
+        }
+
+        .habit-action-btn.delete:hover {
+            color: var(--danger);
         }
 
         /* Add Habit Button */
@@ -275,6 +316,16 @@
 
         .btn-secondary:hover {
             background-color: var(--border-color);
+        }
+
+        .btn-danger {
+            background-color: var(--danger);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background-color: var(--danger-hover);
+            transform: translateY(-2px);
         }
 
         .btn-icon {
@@ -540,7 +591,7 @@
         }
 
         .toast.error {
-            background-color: var(--accent);
+            background-color: var(--danger);
         }
 
         /* Loading Spinner */
@@ -766,6 +817,30 @@
         </div>
     </div>
     
+    <!-- Delete Confirmation Modal -->
+    <div class="modal" id="deleteModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title">Delete Habit</h2>
+                <button class="close-btn" id="closeDeleteModalBtn">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <p style="margin-bottom: 1.5rem; color: var(--text-secondary);">
+                Are you sure you want to delete "<span id="deleteHabitName"></span>"? This action cannot be undone and will remove all associated data.
+            </p>
+            <div style="display: flex; gap: 1rem;">
+                <button class="btn btn-danger" id="confirmDeleteBtn" style="flex: 1;">
+                    <i class="fas fa-trash"></i>
+                    Delete
+                </button>
+                <button class="btn btn-secondary" id="cancelDeleteBtn" style="flex: 1;">
+                    Cancel
+                </button>
+            </div>
+        </div>
+    </div>
+    
     <!-- Toast Notification -->
     <div class="toast" id="toast"></div>
     
@@ -799,6 +874,13 @@
         const toast = document.getElementById('toast');
         const chartZoomBtns = document.querySelectorAll('.chart-zoom-btn');
         
+        // Delete modal elements
+        const deleteModal = document.getElementById('deleteModal');
+        const closeDeleteModalBtn = document.getElementById('closeDeleteModalBtn');
+        const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+        const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
+        const deleteHabitName = document.getElementById('deleteHabitName');
+        
         // Debug elements
         const debugPanel = document.getElementById('debugPanel');
         const debugConnection = document.getElementById('debugConnection');
@@ -814,6 +896,7 @@
         let progressChart = null;
         let currentZoomRange = 'week';
         let isConnected = false;
+        let habitToDelete = null;
         
         // Initialize
         document.addEventListener('DOMContentLoaded', async () => {
@@ -965,6 +1048,32 @@
             }
         });
         
+        // Delete modal controls
+        closeDeleteModalBtn.addEventListener('click', () => {
+            deleteModal.classList.remove('active');
+            habitToDelete = null;
+        });
+        
+        cancelDeleteBtn.addEventListener('click', () => {
+            deleteModal.classList.remove('active');
+            habitToDelete = null;
+        });
+        
+        deleteModal.addEventListener('click', (e) => {
+            if (e.target === deleteModal) {
+                deleteModal.classList.remove('active');
+                habitToDelete = null;
+            }
+        });
+        
+        confirmDeleteBtn.addEventListener('click', async () => {
+            if (habitToDelete) {
+                await deleteHabit(habitToDelete.id);
+                deleteModal.classList.remove('active');
+                habitToDelete = null;
+            }
+        });
+        
         // Add habit form
         addHabitForm.addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -1043,6 +1152,14 @@
                     <span class="habit-streak">
                         <i class="fas fa-fire"></i> ${calculateStreak(habit.id)}
                     </span>
+                    <div class="habit-actions">
+                        <button class="habit-action-btn edit" data-habit-id="${habit.id}" data-habit-name="${habit.name}">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button class="habit-action-btn delete" data-habit-id="${habit.id}" data-habit-name="${habit.name}">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
                 `;
                 
                 const checkbox = habitItem.querySelector('.habit-checkbox');
@@ -1050,10 +1167,60 @@
                     await toggleHabitCompletion(habit.id, checkbox.checked, selectedDateStr);
                 });
                 
+                const deleteBtn = habitItem.querySelector('.delete');
+                deleteBtn.addEventListener('click', () => {
+                    showDeleteConfirmation(habit);
+                });
+                
+                const editBtn = habitItem.querySelector('.edit');
+                editBtn.addEventListener('click', () => {
+                    showToast('Edit feature coming soon!', 'info');
+                });
+                
                 habitList.appendChild(habitItem);
             });
             
             document.getElementById('totalHabits').textContent = habits.length;
+        }
+        
+        // Show delete confirmation modal
+        function showDeleteConfirmation(habit) {
+            habitToDelete = habit;
+            deleteHabitName.textContent = habit.name;
+            deleteModal.classList.add('active');
+        }
+        
+        // Delete habit
+        async function deleteHabit(habitId) {
+            if (!isConnected) {
+                showToast('Database not connected', 'error');
+                return;
+            }
+            
+            try {
+                // First, delete all habit entries associated with this habit
+                const { error: entriesError } = await supabase
+                    .from('habit_entries')
+                    .delete()
+                    .eq('habit_id', habitId);
+                
+                if (entriesError) throw entriesError;
+                
+                // Then delete the habit itself
+                const { error: habitError } = await supabase
+                    .from('habits')
+                    .delete()
+                    .eq('id', habitId);
+                
+                if (habitError) throw habitError;
+                
+                showToast('Habit deleted successfully!');
+                await loadData();
+                
+            } catch (error) {
+                console.error('Error deleting habit:', error);
+                showToast('Error deleting habit: ' + error.message, 'error');
+            }
         }
         
         // Toggle habit completion
