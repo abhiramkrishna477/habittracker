@@ -849,6 +849,7 @@
         <div>Connection: <span id="debugConnection">Checking...</span></div>
         <div>Habits: <span id="debugHabits">0</span></div>
         <div>Entries: <span id="debugEntries">0</span></div>
+        <div>Chart Updates: <span id="debugChartUpdates">0</span></div>
     </div>
     
     <script>
@@ -886,6 +887,7 @@
         const debugConnection = document.getElementById('debugConnection');
         const debugHabits = document.getElementById('debugHabits');
         const debugEntries = document.getElementById('debugEntries');
+        const debugChartUpdates = document.getElementById('debugChartUpdates');
         
         // State
         let currentDate = new Date();
@@ -897,6 +899,8 @@
         let currentZoomRange = 'week';
         let isConnected = false;
         let habitToDelete = null;
+        let chartUpdateCount = 0;
+        let isUpdatingChart = false;
         
         // Initialize
         document.addEventListener('DOMContentLoaded', async () => {
@@ -990,10 +994,39 @@
                     { event: '*', schema: 'public', table: 'habit_entries' },
                     (payload) => {
                         console.log('Habit entry change:', payload);
-                        loadData();
+                        // For habit entries, we'll update the chart directly for better UX
+                        // instead of reloading all data
+                        handleHabitEntryChange(payload);
                     }
                 )
                 .subscribe();
+        }
+        
+        // Handle habit entry changes for immediate chart updates
+        function handleHabitEntryChange(payload) {
+            if (!progressChart || isUpdatingChart) return;
+            
+            const { eventType, new: newEntry, old: oldEntry } = payload;
+            
+            // Update local data
+            if (eventType === 'INSERT') {
+                habitEntries.push(newEntry);
+            } else if (eventType === 'UPDATE') {
+                const index = habitEntries.findIndex(e => e.id === newEntry.id);
+                if (index !== -1) {
+                    habitEntries[index] = newEntry;
+                }
+            } else if (eventType === 'DELETE') {
+                habitEntries = habitEntries.filter(e => e.id !== oldEntry.id);
+            }
+            
+            // Update chart immediately without full reload
+            updateChartDataOnly();
+            
+            // Update other components
+            renderHabits();
+            updateAnalytics();
+            renderCalendar();
         }
         
         // Update date display
@@ -1164,7 +1197,17 @@
                 
                 const checkbox = habitItem.querySelector('.habit-checkbox');
                 checkbox.addEventListener('change', async () => {
+                    // Immediate UI feedback
+                    checkbox.disabled = true;
+                    
+                    // Optimistically update the chart
+                    updateChartForOptimisticUI(habit.id, checkbox.checked, selectedDateStr);
+                    
+                    // Then update the database
                     await toggleHabitCompletion(habit.id, checkbox.checked, selectedDateStr);
+                    
+                    // Re-enable checkbox
+                    checkbox.disabled = false;
                 });
                 
                 const deleteBtn = habitItem.querySelector('.delete');
@@ -1181,6 +1224,31 @@
             });
             
             document.getElementById('totalHabits').textContent = habits.length;
+        }
+        
+        // Optimistically update chart for immediate feedback
+        function updateChartForOptimisticUI(habitId, completed, date) {
+            if (!progressChart) return;
+            
+            // Find the index of the date in the chart
+            const { labels } = progressChart.data;
+            const dateObj = new Date(date);
+            const dateLabel = dateObj.toLocaleDateString('en-US', { 
+                month: 'short', 
+                day: 'numeric'
+            });
+            
+            const dataIndex = labels.findIndex(label => label === dateLabel);
+            
+            if (dataIndex !== -1) {
+                // Update the data value
+                const currentValue = progressChart.data.datasets[0].data[dataIndex];
+                const newValue = completed ? currentValue + 1 : Math.max(0, currentValue - 1);
+                progressChart.data.datasets[0].data[dataIndex] = newValue;
+                
+                // Update the chart with animation
+                progressChart.update('none'); // Use 'none' for immediate update
+            }
         }
         
         // Show delete confirmation modal
@@ -1269,8 +1337,27 @@
                 
                 showToast(completed ? 'Habit marked as complete!' : 'Habit marked as incomplete');
                 
-                // Reload data to update all UI components
-                await loadData();
+                // Update local data for chart
+                const entryIndex = habitEntries.findIndex(e => 
+                    e.habit_id === habitId && e.date === date
+                );
+                
+                if (entryIndex !== -1) {
+                    habitEntries[entryIndex].completed = completed;
+                } else {
+                    habitEntries.push({
+                        habit_id: habitId,
+                        date: date,
+                        completed: completed,
+                        created_at: new Date().toISOString()
+                    });
+                }
+                
+                // Update chart with animation
+                updateChartDataOnly();
+                
+                // Update other components
+                updateAnalytics();
                 
             } catch (error) {
                 console.error('Error updating habit:', error);
@@ -1281,6 +1368,9 @@
                 if (checkbox) {
                     checkbox.checked = !completed;
                 }
+                
+                // Revert chart
+                updateChartDataOnly();
             }
         }
         
@@ -1344,7 +1434,28 @@
             document.getElementById('avgHabits').textContent = avgHabits;
         }
         
-        // Update progress chart
+        // Update progress chart data only (more efficient)
+        function updateChartDataOnly() {
+            if (!progressChart || isUpdatingChart) return;
+            
+            isUpdatingChart = true;
+            chartUpdateCount++;
+            debugChartUpdates.textContent = chartUpdateCount;
+            
+            // Prepare data based on zoom range
+            const { labels, data } = prepareChartData(currentZoomRange);
+            
+            // Update only the data, not recreate the entire chart
+            progressChart.data.labels = labels;
+            progressChart.data.datasets[0].data = data;
+            
+            // Update with animation
+            progressChart.update();
+            
+            isUpdatingChart = false;
+        }
+        
+        // Update progress chart (full recreation)
         function updateProgressChart() {
             const ctx = document.getElementById('progressChart').getContext('2d');
             
