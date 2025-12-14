@@ -1,688 +1,391 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>HabitFlow</title>
-    
-    <!-- Libraries -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>HabitFlow Dashboard</title>
 
-    <!-- Config -->
-    <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: {
-                extend: {
-                    fontFamily: { sans: ['Inter', 'sans-serif'] },
-                    colors: {
-                        background: '#09090b',
-                        surface: '#18181b',
-                        surfaceHighlight: '#27272a',
-                        primary: '#10b981',
-                        primaryDark: '#059669',
-                        danger: '#ef4444',
-                    }
-                }
-            }
+  <!-- Fonts & Icons -->
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200..800&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+
+  <!-- Tailwind -->
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            primary: "#19e65e",
+            background: "#0d1811",
+            surface: "#16231b",
+            borderc: "#2f4538"
+          },
+          fontFamily: {
+            display: ["Manrope", "sans-serif"]
+          }
         }
-    </script>
-    <style>
-        body { background-color: #09090b; color: #f4f4f5; }
-        ::-webkit-scrollbar { width: 8px; height: 8px; }
-        ::-webkit-scrollbar-track { background: #18181b; }
-        ::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #52525b; }
-        .fade-in { animation: fadeIn 0.3s ease-out; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
-        /* Custom Date Picker Styling */
-        input[type="date"]::-webkit-calendar-picker-indicator {
-            filter: invert(1);
-            cursor: pointer;
-        }
-    </style>
-<script type="importmap">
-{
-  "imports": {
-    "react": "https://esm.sh/react@^19.2.3",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "lucide-react": "https://esm.sh/lucide-react@^0.561.0",
-    "recharts": "https://esm.sh/recharts@^3.5.1",
-    "date-fns": "https://esm.sh/date-fns@^4.1.0"
+      }
+    }
+  </script>
+</head>
+
+<body class="bg-background text-white font-display overflow-hidden">
+
+<div class="flex h-screen">
+
+  <!-- SIDEBAR -->
+  <aside class="w-64 bg-surface border-r border-borderc p-6 hidden md:flex flex-col">
+    <h1 class="text-2xl font-bold mb-8">HabitFlow</h1>
+    <nav class="flex flex-col gap-3 text-gray-400">
+      <span class="text-primary font-bold">Dashboard</span>
+      <span>Habits</span>
+      <span>Calendar</span>
+      <span>Settings</span>
+    </nav>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="flex-1 overflow-y-auto p-8 space-y-8">
+
+    <!-- HEADER -->
+    <div class="flex justify-between items-center">
+      <h2 class="text-3xl font-bold">Overview</h2>
+      <span id="dateDisplay" class="text-gray-400"></span>
+    </div>
+
+    <!-- METRICS -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div class="bg-surface p-4 rounded-xl">
+        <p class="text-gray-400 text-sm">Completion Rate</p>
+        <p id="completionRate" class="text-3xl font-bold">0%</p>
+      </div>
+      <div class="bg-surface p-4 rounded-xl">
+        <p class="text-gray-400 text-sm">Current Streak</p>
+        <p id="streakCounter" class="text-3xl font-bold">🔥 0</p>
+      </div>
+      <div class="bg-surface p-4 rounded-xl">
+        <p class="text-gray-400 text-sm">Total Habits</p>
+        <p id="totalHabits" class="text-3xl font-bold">0</p>
+      </div>
+      <div class="bg-surface p-4 rounded-xl">
+        <p class="text-gray-400 text-sm">Avg / Day</p>
+        <p id="avgHabits" class="text-3xl font-bold">0</p>
+      </div>
+    </div>
+
+    <!-- CHART -->
+    <div class="bg-surface p-6 rounded-2xl">
+      <h3 class="font-bold mb-4">Progress (Last 7 Days)</h3>
+      <div class="h-[300px]">
+        <canvas id="progressChart"></canvas>
+      </div>
+    </div>
+
+    <!-- HABITS -->
+    <div class="bg-surface p-6 rounded-2xl">
+      <div class="flex justify-between items-center mb-4">
+        <h3 id="journalTitle" class="font-bold text-xl">Today's Habits</h3>
+        <button id="addHabitBtn" class="bg-primary text-black px-4 py-2 rounded-lg font-bold">Add Habit</button>
+      </div>
+      <ul id="habitList" class="space-y-3"></ul>
+    </div>
+
+    <!-- CALENDAR -->
+    <div class="bg-surface p-6 rounded-2xl">
+      <div class="flex justify-between items-center mb-4">
+        <button id="prevMonth">◀</button>
+        <span id="currentMonth"></span>
+        <button id="nextMonth">▶</button>
+      </div>
+      <div id="calendarGrid" class="grid grid-cols-7 gap-2"></div>
+    </div>
+
+  </main>
+</div>
+
+<!-- FLOATING ADD -->
+<button id="floatingAddBtn"
+  class="fixed bottom-8 right-8 bg-primary text-black w-16 h-16 rounded-full text-3xl font-bold">+</button>
+
+<!-- ADD HABIT MODAL -->
+<div id="addHabitModal" class="fixed inset-0 bg-black/60 hidden items-center justify-center">
+  <form id="addHabitForm" class="bg-surface p-6 rounded-xl space-y-4 w-96">
+    <h3 class="font-bold text-xl">Add Habit</h3>
+    <input id="habitName" required class="w-full p-2 bg-black rounded" placeholder="Habit name"/>
+    <textarea id="habitDescription" class="w-full p-2 bg-black rounded" placeholder="Description"></textarea>
+    <select id="habitFrequency" class="w-full p-2 bg-black rounded">
+      <option value="daily">Daily</option>
+      <option value="weekly">Weekly</option>
+    </select>
+    <button class="bg-primary text-black w-full py-2 font-bold rounded">Save</button>
+  </form>
+</div>
+
+<!-- DELETE MODAL -->
+<div id="deleteModal" class="fixed inset-0 bg-black/60 hidden items-center justify-center">
+  <div class="bg-surface p-6 rounded-xl w-96 space-y-4">
+    <p>Delete <span id="deleteHabitName"></span>?</p>
+    <button id="confirmDeleteBtn" class="bg-red-500 w-full py-2 rounded">Delete</button>
+    <button id="cancelDeleteBtn" class="w-full py-2">Cancel</button>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-surface px-6 py-3 rounded hidden"></div>
+
+<script>
+/* ===============================
+   SUPABASE
+================================ */
+const supabase = window.supabase.createClient(
+  "https://jtpsnufycomhozsiegjh.supabase.co",
+  "YOUR_PUBLIC_ANON_KEY"
+);
+
+/* ===============================
+   DOM
+================================ */
+const addHabitBtn = document.getElementById("addHabitBtn");
+const floatingAddBtn = document.getElementById("floatingAddBtn");
+const addHabitModal = document.getElementById("addHabitModal");
+const addHabitForm = document.getElementById("addHabitForm");
+const habitList = document.getElementById("habitList");
+const dateDisplay = document.getElementById("dateDisplay");
+const journalTitle = document.getElementById("journalTitle");
+
+const calendarGrid = document.getElementById("calendarGrid");
+const currentMonth = document.getElementById("currentMonth");
+const prevMonth = document.getElementById("prevMonth");
+const nextMonth = document.getElementById("nextMonth");
+
+const deleteModal = document.getElementById("deleteModal");
+const deleteHabitName = document.getElementById("deleteHabitName");
+const confirmDeleteBtn = document.getElementById("confirmDeleteBtn");
+const cancelDeleteBtn = document.getElementById("cancelDeleteBtn");
+
+/* ===============================
+   STATE
+================================ */
+let habits = [];
+let habitEntries = [];
+let selectedDate = new Date();
+let currentMonthDate = new Date();
+let habitToDelete = null;
+let progressChart = null;
+
+/* ===============================
+   INIT
+================================ */
+document.addEventListener("DOMContentLoaded", async () => {
+  updateDateDisplay();
+  renderCalendar();
+  await loadData();
+});
+
+/* ===============================
+   DATE
+================================ */
+function updateDateDisplay() {
+  dateDisplay.textContent = selectedDate.toDateString();
+  journalTitle.textContent =
+    selectedDate.toDateString() === new Date().toDateString()
+      ? "Today's Habits"
+      : `Habits for ${selectedDate.toDateString()}`;
+}
+
+/* ===============================
+   LOAD DATA
+================================ */
+async function loadData() {
+  const { data: h } = await supabase.from("habits").select("*").eq("active", true);
+  const { data: e } = await supabase.from("habit_entries").select("*");
+  habits = h || [];
+  habitEntries = e || [];
+  renderHabits();
+  updateAnalytics();
+  updateProgressChart();
+}
+
+/* ===============================
+   HABITS
+================================ */
+function renderHabits() {
+  habitList.innerHTML = "";
+  const dateStr = selectedDate.toISOString().split("T")[0];
+
+  habits.forEach(habit => {
+    const entry = habitEntries.find(e => e.habit_id === habit.id && e.date === dateStr);
+    const completed = entry?.completed || false;
+
+    const li = document.createElement("li");
+    li.className = "flex items-center gap-3 bg-black/30 p-3 rounded-lg";
+
+    li.innerHTML = `
+      <input type="checkbox" ${completed ? "checked" : ""} />
+      <span class="flex-1">${habit.name}</span>
+      <span>🔥 ${calculateStreak(habit.id)}</span>
+      <button class="text-red-400">✕</button>
+    `;
+
+    li.querySelector("input").onchange = e =>
+      toggleHabitCompletion(habit.id, e.target.checked, dateStr);
+
+    li.querySelector("button").onclick = () => {
+      habitToDelete = habit;
+      deleteHabitName.textContent = habit.name;
+      deleteModal.classList.remove("hidden");
+    };
+
+    habitList.appendChild(li);
+  });
+
+  document.getElementById("totalHabits").textContent = habits.length;
+}
+
+/* ===============================
+   TOGGLE
+================================ */
+async function toggleHabitCompletion(habitId, completed, date) {
+  const { data: existing } = await supabase
+    .from("habit_entries")
+    .select("*")
+    .eq("habit_id", habitId)
+    .eq("date", date)
+    .single();
+
+  if (existing) {
+    await supabase.from("habit_entries").update({ completed }).eq("id", existing.id);
+  } else {
+    await supabase.from("habit_entries").insert([{ habit_id: habitId, date, completed }]);
+  }
+  loadData();
+}
+
+/* ===============================
+   STREAK
+================================ */
+function calculateStreak(habitId) {
+  const entries = habitEntries
+    .filter(e => e.habit_id === habitId && e.completed)
+    .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  let streak = 0;
+  let d = new Date(); d.setHours(0,0,0,0);
+
+  for (const e of entries) {
+    const ed = new Date(e.date); ed.setHours(0,0,0,0);
+    if ((d - ed) / 86400000 === streak) streak++;
+    else break;
+  }
+  return streak;
+}
+
+/* ===============================
+   ANALYTICS
+================================ */
+function updateAnalytics() {
+  const completed = habitEntries.filter(e => e.completed).length;
+  document.getElementById("completionRate").textContent =
+    habits.length ? Math.round((completed / (habits.length * 7)) * 100) + "%" : "0%";
+  document.getElementById("avgHabits").textContent =
+    completed ? (completed / 7).toFixed(1) : "0";
+
+  const streaks = habits.map(h => calculateStreak(h.id));
+  document.getElementById("streakCounter").textContent = "🔥 " + Math.max(...streaks, 0);
+}
+
+/* ===============================
+   CHART
+================================ */
+function updateProgressChart() {
+  const ctx = document.getElementById("progressChart");
+  if (progressChart) progressChart.destroy();
+
+  const labels = [];
+  const data = [];
+
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    const ds = d.toISOString().split("T")[0];
+    labels.push(d.toLocaleDateString("en-US", { weekday: "short" }));
+    data.push(habitEntries.filter(e => e.date === ds && e.completed).length);
+  }
+
+  progressChart = new Chart(ctx, {
+    type: "line",
+    data: { labels, datasets: [{ data, borderColor: "#19e65e", fill: true }] },
+    options: { plugins: { legend: { display: false } } }
+  });
+}
+
+/* ===============================
+   CALENDAR
+================================ */
+function renderCalendar() {
+  calendarGrid.innerHTML = "";
+  currentMonth.textContent = currentMonthDate.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+
+  const y = currentMonthDate.getFullYear();
+  const m = currentMonthDate.getMonth();
+  const first = new Date(y, m, 1).getDay();
+  const days = new Date(y, m + 1, 0).getDate();
+
+  for (let i = 0; i < first; i++) calendarGrid.appendChild(document.createElement("div"));
+
+  for (let d = 1; d <= days; d++) {
+    const el = document.createElement("div");
+    el.textContent = d;
+    el.className = "p-2 text-center rounded cursor-pointer hover:bg-primary/20";
+    el.onclick = () => {
+      selectedDate = new Date(y, m, d);
+      updateDateDisplay();
+      renderHabits();
+      renderCalendar();
+    };
+    calendarGrid.appendChild(el);
   }
 }
+
+prevMonth.onclick = () => { currentMonthDate.setMonth(currentMonthDate.getMonth() - 1); renderCalendar(); };
+nextMonth.onclick = () => { currentMonthDate.setMonth(currentMonthDate.getMonth() + 1); renderCalendar(); };
+
+/* ===============================
+   MODALS
+================================ */
+addHabitBtn.onclick = floatingAddBtn.onclick = () =>
+  addHabitModal.classList.remove("hidden");
+
+addHabitForm.onsubmit = async e => {
+  e.preventDefault();
+  await supabase.from("habits").insert([{
+    name: habitName.value,
+    description: habitDescription.value,
+    frequency: habitFrequency.value,
+    active: true
+  }]);
+  addHabitModal.classList.add("hidden");
+  addHabitForm.reset();
+  loadData();
+};
+
+confirmDeleteBtn.onclick = async () => {
+  await supabase.from("habit_entries").delete().eq("habit_id", habitToDelete.id);
+  await supabase.from("habits").delete().eq("id", habitToDelete.id);
+  deleteModal.classList.add("hidden");
+  loadData();
+};
+
+cancelDeleteBtn.onclick = () => deleteModal.classList.add("hidden");
 </script>
-</head>
-<body class="overflow-hidden">
-    <div id="app" class="flex h-screen"></div>
 
-    <!-- Application Logic -->
-    <script>
-        // --- TYPES & CONSTANTS ---
-        const HABITS_KEY = 'habitflow_habits';
-        const ENTRIES_KEY = 'habitflow_entries';
-
-        // --- STATE MANAGEMENT ---
-        const store = {
-            habits: [],
-            entries: [],
-            view: 'dashboard', // dashboard | habits | calendar | settings
-            dashboardDate: new Date(), // Selected date for dashboard
-            isModalOpen: false,
-            isMobileMenuOpen: false
-        };
-
-        // --- SERVICE LAYER ---
-        const Service = {
-            init() {
-                const hData = localStorage.getItem(HABITS_KEY);
-                const eData = localStorage.getItem(ENTRIES_KEY);
-                
-                if (hData) {
-                    store.habits = JSON.parse(hData);
-                } else {
-                    // Seed initial data
-                    store.habits = [
-                        { id: '1', name: 'Morning Meditation', description: '10 mins mindfulness', frequency: 'daily', active: true, createdAt: new Date().toISOString(), streak: 5 },
-                        { id: '2', name: 'Read 30 Pages', description: 'Atomic Habits', frequency: 'daily', active: true, createdAt: new Date().toISOString(), streak: 12 },
-                        { id: '3', name: 'Drink 2L Water', description: 'Stay hydrated', frequency: 'daily', active: true, createdAt: new Date().toISOString(), streak: 2 },
-                    ];
-                    this.saveHabits();
-                }
-                store.entries = eData ? JSON.parse(eData) : [];
-            },
-
-            saveHabits() {
-                localStorage.setItem(HABITS_KEY, JSON.stringify(store.habits));
-            },
-
-            saveEntries() {
-                localStorage.setItem(ENTRIES_KEY, JSON.stringify(store.entries));
-            },
-
-            addHabit(habit) {
-                const newHabit = {
-                    ...habit,
-                    id: Math.random().toString(36).substr(2, 9),
-                    createdAt: new Date().toISOString(),
-                    streak: 0
-                };
-                store.habits.push(newHabit);
-                this.saveHabits();
-                render();
-            },
-
-            deleteHabit(id) {
-                store.habits = store.habits.filter(h => h.id !== id);
-                store.entries = store.entries.filter(e => e.habitId !== id);
-                this.saveHabits();
-                this.saveEntries();
-                render();
-            },
-
-            toggleEntry(habitId, dateStr) {
-                const idx = store.entries.findIndex(e => e.habitId === habitId && e.date === dateStr);
-                if (idx >= 0) {
-                    store.entries[idx].completed = !store.entries[idx].completed;
-                } else {
-                    store.entries.push({
-                        id: Math.random().toString(36).substr(2, 9),
-                        habitId,
-                        date: dateStr,
-                        completed: true,
-                        timestamp: new Date().toISOString()
-                    });
-                }
-                this.updateStreak(habitId);
-                this.saveEntries();
-                render();
-            },
-
-            updateStreak(habitId) {
-                const habit = store.habits.find(h => h.id === habitId);
-                if (!habit) return;
-
-                const habitEntries = store.entries
-                    .filter(e => e.habitId === habitId && e.completed)
-                    .sort((a, b) => new Date(b.date) - new Date(a.date));
-
-                let streak = 0;
-                let checkDate = new Date();
-                checkDate.setHours(0,0,0,0);
-
-                // Check today
-                const todayStr = checkDate.toISOString().split('T')[0];
-                const hasToday = habitEntries.some(e => e.date === todayStr);
-
-                if (!hasToday) {
-                    checkDate.setDate(checkDate.getDate() - 1);
-                    const yesterdayStr = checkDate.toISOString().split('T')[0];
-                    if (!habitEntries.some(e => e.date === yesterdayStr)) {
-                        habit.streak = 0;
-                        return;
-                    }
-                    streak = 1; // Started yesterday
-                    checkDate.setDate(checkDate.getDate() - 1);
-                } else {
-                    streak = 1; // Started today
-                    checkDate.setDate(checkDate.getDate() - 1);
-                }
-
-                while (true) {
-                    const dStr = checkDate.toISOString().split('T')[0];
-                    if (habitEntries.some(e => e.date === dStr)) {
-                        streak++;
-                        checkDate.setDate(checkDate.getDate() - 1);
-                    } else {
-                        break;
-                    }
-                }
-                habit.streak = streak;
-                this.saveHabits();
-            }
-        };
-
-        // --- HELPER FUNCTIONS ---
-        const formatDate = (date) => date.toISOString().split('T')[0];
-        const getDayName = (date) => date.toLocaleDateString('en-US', { weekday: 'short' });
-        const getFullDate = (date) => date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
-
-        // --- COMPONENT RENDERERS ---
-
-        function renderSidebar() {
-            const navItem = (id, icon, label) => `
-                <button onclick="navigate('${id}')" 
-                    class="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group ${store.view === id ? 'bg-primary/10 text-primary font-semibold' : 'text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-100'}">
-                    <i data-lucide="${icon}" class="w-5 h-5 ${store.view === id ? 'text-primary' : 'text-zinc-500 group-hover:text-zinc-300'}"></i>
-                    <span>${label}</span>
-                    ${store.view === id ? '<div class="ml-auto w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>' : ''}
-                </button>
-            `;
-
-            return `
-                <aside class="fixed md:relative z-50 w-72 h-full bg-surface border-r border-zinc-800/50 flex flex-col transition-transform duration-300 ${store.isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'}">
-                    <div class="p-8 flex items-center gap-3">
-                        <div class="w-8 h-8 rounded-lg bg-gradient-to-tr from-primary to-emerald-300 flex items-center justify-center shadow-lg shadow-emerald-500/20">
-                            <i data-lucide="check-circle" class="w-5 h-5 text-white"></i>
-                        </div>
-                        <h1 class="text-xl font-bold tracking-tight text-white">HabitFlow</h1>
-                    </div>
-                    <nav class="flex-1 px-4 space-y-2">
-                        ${navItem('dashboard', 'layout-dashboard', 'Dashboard')}
-                        ${navItem('habits', 'check-circle', 'My Habits')}
-                        ${navItem('calendar', 'calendar', 'Calendar')}
-                        ${navItem('settings', 'settings', 'Settings')}
-                    </nav>
-                    <div class="p-6 border-t border-zinc-800/50">
-                        <div class="p-4 rounded-xl bg-zinc-900 border border-zinc-800">
-                            <p class="text-xs text-zinc-500 mb-2">Progress</p>
-                            <div class="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden mb-2">
-                                <div class="w-3/4 h-full bg-primary rounded-full"></div>
-                            </div>
-                            <p class="text-xs text-zinc-400 font-medium">Keep it up!</p>
-                        </div>
-                    </div>
-                </aside>
-                ${store.isMobileMenuOpen ? `<div onclick="toggleMobileMenu()" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 md:hidden"></div>` : ''}
-            `;
-        }
-
-        function renderDashboard() {
-            const dateStr = formatDate(store.dashboardDate);
-            const isToday = dateStr === formatDate(new Date());
-
-            // Stats Logic
-            const activeHabits = store.habits.filter(h => h.active);
-            const totalActive = activeHabits.length;
-            const completedToday = activeHabits.filter(h => 
-                store.entries.some(e => e.habitId === h.id && e.date === dateStr && e.completed)
-            ).length;
-            const completionRate = totalActive ? Math.round((completedToday / totalActive) * 100) : 0;
-            const bestStreak = store.habits.length ? Math.max(...store.habits.map(h => h.streak)) : 0;
-
-            // Habits List HTML
-            const habitsHtml = activeHabits.length === 0 
-                ? `<div class="text-center py-10 text-zinc-500">No habits yet. Start by adding one!</div>`
-                : activeHabits.map(h => {
-                    const isDone = store.entries.some(e => e.habitId === h.id && e.date === dateStr && e.completed);
-                    return `
-                        <div onclick="Service.toggleEntry('${h.id}', '${dateStr}')" 
-                             class="group cursor-pointer flex items-center p-3 rounded-xl border transition-all duration-200 ${isDone ? 'bg-primary/5 border-primary/20' : 'bg-zinc-900/50 border-zinc-800 hover:border-zinc-700 hover:bg-zinc-800'}">
-                            <div class="w-6 h-6 rounded-full border-2 flex items-center justify-center mr-4 transition-colors ${isDone ? 'bg-primary border-primary text-white' : 'border-zinc-600 group-hover:border-primary/50 text-transparent'}">
-                                <i data-lucide="check" class="w-3.5 h-3.5"></i>
-                            </div>
-                            <div class="flex-1">
-                                <h4 class="font-medium ${isDone ? 'text-zinc-400 line-through decoration-zinc-600' : 'text-zinc-200'}">${h.name}</h4>
-                                ${h.streak > 0 ? `<div class="flex items-center gap-1 text-xs text-orange-500 mt-0.5"><i data-lucide="flame" class="w-3 h-3"></i><span>${h.streak} day streak</span></div>` : ''}
-                            </div>
-                        </div>
-                    `;
-                }).join('');
-
-            return `
-                <div class="space-y-8 fade-in pb-10">
-                    <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
-                        <div>
-                            <h2 class="text-3xl font-bold text-white mb-2">Dashboard</h2>
-                            <div class="flex items-center gap-4 bg-surface/50 p-1.5 rounded-lg border border-zinc-800/50 w-fit">
-                                <button onclick="changeDashboardDate(-1)" class="p-1 hover:text-white text-zinc-400 transition-colors"><i data-lucide="chevron-left" class="w-5 h-5"></i></button>
-                                <div class="relative flex items-center gap-2 px-2">
-                                    <i data-lucide="calendar" class="w-4 h-4 text-primary"></i>
-                                    <span class="text-sm font-medium text-zinc-200 min-w-[150px] text-center cursor-pointer hover:text-white transition-colors" onclick="document.getElementById('datePicker').showPicker()">${getFullDate(store.dashboardDate)}</span>
-                                    <input type="date" id="datePicker" class="absolute inset-0 opacity-0 cursor-pointer" 
-                                           value="${dateStr}" 
-                                           onchange="setDashboardDate(this.value)">
-                                </div>
-                                <button onclick="changeDashboardDate(1)" class="p-1 hover:text-white text-zinc-400 transition-colors" ${isToday ? 'disabled class="opacity-30 p-1"' : ''}><i data-lucide="chevron-right" class="w-5 h-5"></i></button>
-                                ${!isToday ? `<button onclick="setDashboardDate(new Date())" class="text-xs bg-zinc-800 hover:bg-zinc-700 px-2 py-1 rounded text-zinc-300 ml-2">Today</button>` : ''}
-                            </div>
-                        </div>
-                        <button onclick="openModal()" class="bg-primary hover:bg-primaryDark text-white px-5 py-2.5 rounded-lg flex items-center gap-2 font-medium transition-all shadow-lg shadow-emerald-500/20 active:scale-95">
-                            <i data-lucide="plus" class="w-5 h-5"></i><span>New Habit</span>
-                        </button>
-                    </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        ${renderStatsCard('Daily Completion', `${completionRate}%`, 'activity', 'text-primary', 'bg-primary/10')}
-                        ${renderStatsCard('Best Streak', `${bestStreak} Days`, 'flame', 'text-orange-500', 'bg-orange-500/10')}
-                        ${renderStatsCard('Total Active', totalActive, 'list-todo', 'text-blue-500', 'bg-blue-500/10')}
-                        ${renderStatsCard('Done Today', completedToday, 'check-circle', 'text-emerald-500', 'bg-emerald-500/10')}
-                    </div>
-
-                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                        <div class="lg:col-span-2 bg-surface border border-zinc-800 rounded-2xl p-6 shadow-sm">
-                            <div class="flex items-center justify-between mb-6">
-                                <h3 class="text-lg font-semibold text-white flex items-center gap-2">
-                                    <i data-lucide="trending-up" class="w-5 h-5 text-zinc-400"></i> Activity Overview
-                                </h3>
-                            </div>
-                            <div class="h-[300px] w-full relative">
-                                <canvas id="activityChart"></canvas>
-                            </div>
-                        </div>
-
-                        <div class="bg-surface border border-zinc-800 rounded-2xl p-6 shadow-sm flex flex-col h-full max-h-[400px]">
-                            <h3 class="text-lg font-semibold text-white mb-6 flex items-center gap-2">
-                                <i data-lucide="list-todo" class="w-5 h-5 text-zinc-400"></i> ${isToday ? "Today's Focus" : "History (" + dateStr + ")"}
-                            </h3>
-                            <div class="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar">
-                                ${habitsHtml}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-
-        function renderStatsCard(title, value, icon, colorClass, bgClass) {
-            return `
-                <div class="bg-surface border border-zinc-800 rounded-2xl p-5 hover:border-zinc-700 transition-colors">
-                    <div class="flex justify-between items-start mb-4">
-                        <div class="p-2 rounded-lg ${bgClass} ${colorClass}">
-                            <i data-lucide="${icon}" class="w-5 h-5"></i>
-                        </div>
-                    </div>
-                    <div>
-                        <h4 class="text-zinc-400 text-sm font-medium">${title}</h4>
-                        <p class="text-2xl font-bold text-white mt-1">${value}</p>
-                    </div>
-                </div>
-            `;
-        }
-
-        function renderHabitsPage() {
-            return `
-                <div class="space-y-6 fade-in pb-10">
-                    <div class="flex justify-between items-center">
-                        <div>
-                            <h2 class="text-2xl font-bold text-white">My Habits</h2>
-                            <p class="text-zinc-400">Manage your tracking routines</p>
-                        </div>
-                        <button onclick="openModal()" class="bg-primary hover:bg-primaryDark text-white px-4 py-2 rounded-lg flex items-center gap-2 font-medium transition-colors">
-                            <i data-lucide="plus" class="w-4 h-4"></i><span>Add Habit</span>
-                        </button>
-                    </div>
-
-                    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        ${store.habits.map(h => `
-                            <div class="group bg-surface border border-zinc-800 rounded-xl p-5 hover:border-zinc-700 transition-all hover:-translate-y-1 relative">
-                                <div class="flex justify-between items-start mb-4">
-                                    <div class="flex items-center gap-3">
-                                        <div class="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center text-zinc-300 border border-zinc-700 font-bold">
-                                            ${h.name.charAt(0).toUpperCase()}
-                                        </div>
-                                        <div>
-                                            <h3 class="font-semibold text-white">${h.name}</h3>
-                                            <p class="text-xs text-zinc-500 capitalize">${h.frequency}</p>
-                                        </div>
-                                    </div>
-                                    <button onclick="if(confirm('Delete this habit?')) Service.deleteHabit('${h.id}')" class="text-zinc-500 hover:text-red-500 p-2 rounded-lg hover:bg-red-500/10 transition-colors opacity-0 group-hover:opacity-100 absolute top-4 right-4">
-                                        <i data-lucide="trash-2" class="w-4 h-4"></i>
-                                    </button>
-                                </div>
-                                <p class="text-sm text-zinc-400 mb-6 min-h-[40px] line-clamp-2">${h.description || "No description provided."}</p>
-                                <div class="flex items-center justify-between pt-4 border-t border-zinc-800/50">
-                                    <div class="flex items-center gap-2 text-xs text-zinc-500">
-                                        <i data-lucide="calendar" class="w-3.5 h-3.5"></i>
-                                        <span>Created ${new Date(h.createdAt).toLocaleDateString()}</span>
-                                    </div>
-                                    <div class="flex items-center gap-1.5 px-2 py-1 rounded-md bg-orange-500/10 text-orange-500 text-xs font-medium">
-                                        <i data-lucide="flame" class="w-3 h-3"></i>
-                                        <span>${h.streak} Day Streak</span>
-                                    </div>
-                                </div>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-            `;
-        }
-
-        function renderCalendar() {
-            // Simple Calendar Logic
-            const today = new Date();
-            // We'll use store.dashboardDate as the "view month" cursor for simplicity, 
-            // or we could add a specific calendarViewDate state. Let's use local logic here effectively.
-            if (!store.calendarDate) store.calendarDate = new Date();
-            
-            const year = store.calendarDate.getFullYear();
-            const month = store.calendarDate.getMonth();
-            
-            const firstDay = new Date(year, month, 1);
-            const lastDay = new Date(year, month + 1, 0);
-            const daysInMonth = lastDay.getDate();
-            const startingDay = firstDay.getDay(); // 0 is Sunday
-            
-            let daysHtml = '';
-            
-            // Empty slots
-            for(let i=0; i<startingDay; i++) {
-                daysHtml += `<div class="aspect-square"></div>`;
-            }
-
-            for(let i=1; i<=daysInMonth; i++) {
-                const currentD = new Date(year, month, i);
-                const dStr = formatDate(currentD);
-                const count = store.entries.filter(e => e.date === dStr && e.completed).length;
-                
-                let colorClass = 'bg-zinc-900 border-zinc-800 text-zinc-500';
-                if(count > 0) colorClass = 'bg-emerald-900/30 border-emerald-900/50 text-emerald-400';
-                if(count > 2) colorClass = 'bg-emerald-600/30 border-emerald-600/50 text-emerald-300';
-                if(count > 4) colorClass = 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-500/20';
-
-                const isTodayClass = (dStr === formatDate(today)) ? 'ring-2 ring-white ring-offset-2 ring-offset-zinc-900' : '';
-
-                daysHtml += `
-                    <div onclick="setDashboardDate('${dStr}'); navigate('dashboard')" 
-                         class="aspect-square rounded-xl border flex flex-col items-center justify-center cursor-pointer hover:scale-105 transition-all ${colorClass} ${isTodayClass}">
-                        <span class="text-sm font-semibold">${i}</span>
-                    </div>
-                `;
-            }
-
-            return `
-                <div class="space-y-6 fade-in pb-10">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <h2 class="text-2xl font-bold text-white">Journal Calendar</h2>
-                            <p class="text-zinc-400">View your consistency. Click a day to edit.</p>
-                        </div>
-                        <div class="flex items-center bg-surface border border-zinc-800 rounded-lg p-1">
-                            <button onclick="changeCalendarMonth(-1)" class="p-2 hover:bg-zinc-800 rounded-md text-zinc-400 hover:text-white transition-colors">
-                                <i data-lucide="chevron-left" class="w-5 h-5"></i>
-                            </button>
-                            <span class="px-4 font-medium text-white min-w-[140px] text-center">${firstDay.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}</span>
-                            <button onclick="changeCalendarMonth(1)" class="p-2 hover:bg-zinc-800 rounded-md text-zinc-400 hover:text-white transition-colors">
-                                <i data-lucide="chevron-right" class="w-5 h-5"></i>
-                            </button>
-                        </div>
-                    </div>
-
-                    <div class="bg-surface border border-zinc-800 rounded-2xl p-6 shadow-sm">
-                        <div class="grid grid-cols-7 mb-4">
-                            ${['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => `<div class="text-center text-sm font-medium text-zinc-500 py-2">${d}</div>`).join('')}
-                        </div>
-                        <div class="grid grid-cols-7 gap-2 md:gap-4">
-                            ${daysHtml}
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-
-        function renderSettings() {
-            return `
-                <div class="flex flex-col items-center justify-center h-[60vh] text-zinc-500 fade-in">
-                    <div class="w-16 h-16 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center mb-4">
-                        <i data-lucide="settings" class="w-8 h-8"></i>
-                    </div>
-                    <h2 class="text-xl font-semibold text-white mb-2">Settings</h2>
-                    <p>Configuration options coming soon.</p>
-                </div>
-            `;
-        }
-
-        function renderModal() {
-            if (!store.isModalOpen) return '';
-            return `
-                <div class="fixed inset-0 z-[100] flex items-center justify-center p-4">
-                    <div onclick="closeModal()" class="absolute inset-0 bg-black/60 backdrop-blur-sm fade-in"></div>
-                    <div class="relative bg-surface border border-zinc-800 w-full max-w-md rounded-2xl shadow-2xl fade-in" style="animation-duration: 0.2s">
-                        <div class="flex items-center justify-between p-6 border-b border-zinc-800">
-                            <h3 class="text-xl font-bold text-white">Create New Habit</h3>
-                            <button onclick="closeModal()" class="text-zinc-400 hover:text-white"><i data-lucide="x" class="w-5 h-5"></i></button>
-                        </div>
-                        <form onsubmit="handleHabitSubmit(event)" class="p-6 space-y-4">
-                            <div>
-                                <label class="block text-sm font-medium text-zinc-400 mb-1.5">Habit Name</label>
-                                <input name="name" type="text" required placeholder="e.g. Read 10 pages" class="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-2.5 text-white focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-all">
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-zinc-400 mb-1.5">Description</label>
-                                <textarea name="description" placeholder="Why this habit?" class="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-2.5 text-white focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-all min-h-[100px]"></textarea>
-                            </div>
-                            <div>
-                                <label class="block text-sm font-medium text-zinc-400 mb-1.5">Frequency</label>
-                                <select name="frequency" class="w-full bg-zinc-900 border border-zinc-800 rounded-lg px-4 py-2.5 text-white focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary transition-all">
-                                    <option value="daily">Daily</option>
-                                    <option value="weekly">Weekly</option>
-                                </select>
-                            </div>
-                            <div class="pt-4 flex gap-3">
-                                <button type="button" onclick="closeModal()" class="flex-1 px-4 py-2.5 rounded-lg border border-zinc-800 text-zinc-300 hover:bg-zinc-800 font-medium">Cancel</button>
-                                <button type="submit" class="flex-1 px-4 py-2.5 rounded-lg bg-primary hover:bg-primaryDark text-white font-medium shadow-lg shadow-emerald-500/20">Create Habit</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            `;
-        }
-
-        // --- MAIN RENDER LOOP ---
-        function render() {
-            const app = document.getElementById('app');
-            
-            let mainContent = '';
-            switch(store.view) {
-                case 'dashboard': mainContent = renderDashboard(); break;
-                case 'habits': mainContent = renderHabitsPage(); break;
-                case 'calendar': mainContent = renderCalendar(); break;
-                case 'settings': mainContent = renderSettings(); break;
-            }
-
-            app.innerHTML = `
-                ${renderSidebar()}
-                <main class="flex-1 flex flex-col h-full overflow-hidden relative">
-                    <!-- Mobile Header -->
-                    <header class="md:hidden flex items-center justify-between p-4 border-b border-zinc-800 bg-surface/50 backdrop-blur-md sticky top-0 z-30">
-                        <div class="flex items-center gap-3">
-                            <div class="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center text-primary">
-                                <i data-lucide="check-circle" class="w-5 h-5"></i>
-                            </div>
-                            <span class="font-bold">HabitFlow</span>
-                        </div>
-                        <button onclick="toggleMobileMenu()" class="p-2 text-zinc-400 hover:text-white">
-                            <i data-lucide="${store.isMobileMenuOpen ? 'x' : 'menu'}" class="w-5 h-5"></i>
-                        </button>
-                    </header>
-
-                    <div class="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-8 scroll-smooth">
-                        <div class="max-w-7xl mx-auto w-full">
-                            ${mainContent}
-                        </div>
-                    </div>
-                </main>
-                ${renderModal()}
-            `;
-
-            // Initialize Icons
-            lucide.createIcons();
-
-            // Initialize Chart if on dashboard
-            if (store.view === 'dashboard') {
-                initChart();
-            }
-        }
-
-        // --- CHART LOGIC ---
-        function initChart() {
-            const ctx = document.getElementById('activityChart');
-            if (!ctx) return;
-
-            // Generate last 7 days data based on dashboardDate
-            const labels = [];
-            const dataPoints = [];
-            const baseDate = new Date(store.dashboardDate);
-            
-            for (let i = 6; i >= 0; i--) {
-                const d = new Date(baseDate);
-                d.setDate(d.getDate() - i);
-                labels.push(getDayName(d));
-                const dStr = formatDate(d);
-                const count = store.entries.filter(e => e.date === dStr && e.completed).length;
-                dataPoints.push(count);
-            }
-
-            new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: labels,
-                    datasets: [{
-                        label: 'Completed Habits',
-                        data: dataPoints,
-                        borderColor: '#10b981',
-                        backgroundColor: (context) => {
-                            const bg = context.chart.ctx.createLinearGradient(0, 0, 0, 300);
-                            bg.addColorStop(0, 'rgba(16, 185, 129, 0.3)');
-                            bg.addColorStop(1, 'rgba(16, 185, 129, 0)');
-                            return bg;
-                        },
-                        borderWidth: 3,
-                        tension: 0.4,
-                        fill: true,
-                        pointBackgroundColor: '#10b981',
-                        pointBorderColor: '#18181b',
-                        pointBorderWidth: 2,
-                        pointRadius: 4,
-                        pointHoverRadius: 6
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: { display: false },
-                        tooltip: {
-                            backgroundColor: '#27272a',
-                            titleColor: '#fff',
-                            bodyColor: '#10b981',
-                            borderColor: '#3f3f46',
-                            borderWidth: 1,
-                            padding: 10,
-                            displayColors: false,
-                            callbacks: {
-                                label: (context) => `${context.raw} Habits Completed`
-                            }
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            grid: { color: '#27272a', drawBorder: false },
-                            ticks: { color: '#71717a', stepSize: 1 }
-                        },
-                        x: {
-                            grid: { display: false },
-                            ticks: { color: '#71717a' }
-                        }
-                    }
-                }
-            });
-        }
-
-        // --- ACTIONS ---
-        window.navigate = (view) => {
-            store.view = view;
-            store.isMobileMenuOpen = false;
-            render();
-        };
-
-        window.toggleMobileMenu = () => {
-            store.isMobileMenuOpen = !store.isMobileMenuOpen;
-            render();
-        };
-
-        window.openModal = () => {
-            store.isModalOpen = true;
-            render();
-        };
-
-        window.closeModal = () => {
-            store.isModalOpen = false;
-            render();
-        };
-
-        window.handleHabitSubmit = (e) => {
-            e.preventDefault();
-            const formData = new FormData(e.target);
-            Service.addHabit({
-                name: formData.get('name'),
-                description: formData.get('description'),
-                frequency: formData.get('frequency'),
-                active: true
-            });
-            closeModal();
-        };
-
-        window.setDashboardDate = (val) => {
-            const d = typeof val === 'string' ? new Date(val + 'T12:00:00') : val; // Add time to prevent timezone shift on date only strings
-            store.dashboardDate = d;
-            render();
-        };
-
-        window.changeDashboardDate = (days) => {
-            const newDate = new Date(store.dashboardDate);
-            newDate.setDate(newDate.getDate() + days);
-            store.dashboardDate = newDate;
-            render();
-        };
-
-        window.changeCalendarMonth = (months) => {
-            if (!store.calendarDate) store.calendarDate = new Date();
-            const newDate = new Date(store.calendarDate);
-            newDate.setMonth(newDate.getMonth() + months);
-            store.calendarDate = newDate;
-            render();
-        };
-
-        // --- INIT ---
-        Service.init();
-        render();
-
-    </script>
 </body>
 </html>
