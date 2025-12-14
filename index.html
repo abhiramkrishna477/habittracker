@@ -1,390 +1,322 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>HabitFlow Dashboard</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>HabitFlow</title>
 
-  <!-- Fonts & Icons -->
-  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@200..800&display=swap" rel="stylesheet"/>
-  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-  <!-- Tailwind -->
-  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+<style>
+:root {
+  --bg:#1e1e1e;
+  --panel:#252525;
+  --panel2:#2d2d2d;
+  --text:#fff;
+  --muted:#aaa;
+  --accent:#4CAF50;
+  --danger:#f44336;
+}
 
-  <!-- Chart.js -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:Inter,system-ui;
+  background:var(--bg);
+  color:var(--text);
+}
 
-  <!-- Supabase -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+.app{
+  display:flex;
+  height:100vh;
+}
 
-  <script>
-    tailwind.config = {
-      darkMode: "class",
-      theme: {
-        extend: {
-          colors: {
-            primary: "#19e65e",
-            background: "#0d1811",
-            surface: "#16231b",
-            borderc: "#2f4538"
-          },
-          fontFamily: {
-            display: ["Manrope", "sans-serif"]
-          }
-        }
-      }
-    }
-  </script>
+aside{
+  width:250px;
+  background:var(--panel);
+  padding:24px;
+}
+
+aside h1{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  margin-bottom:32px;
+}
+
+nav a{
+  display:flex;
+  gap:10px;
+  padding:12px;
+  border-radius:8px;
+  color:var(--muted);
+  cursor:pointer;
+}
+nav a.active,nav a:hover{
+  background:var(--panel2);
+  color:var(--accent);
+}
+
+main{
+  flex:1;
+  padding:24px;
+  overflow:auto;
+}
+
+.stats{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(200px,1fr));
+  gap:16px;
+  margin-bottom:24px;
+}
+
+.stat{
+  background:var(--panel);
+  padding:16px;
+  border-radius:12px;
+  text-align:center;
+}
+
+.stat h2{
+  color:var(--accent);
+  margin:0;
+}
+
+.grid{
+  display:grid;
+  grid-template-columns:2fr 1fr;
+  gap:24px;
+}
+
+.card{
+  background:var(--panel);
+  border-radius:12px;
+  padding:16px;
+}
+
+.habit{
+  display:flex;
+  align-items:center;
+  gap:12px;
+  padding:12px;
+  background:var(--panel2);
+  border-radius:8px;
+  margin-bottom:10px;
+}
+
+.habit.done{
+  opacity:.5;
+  text-decoration:line-through;
+}
+
+button{
+  background:var(--accent);
+  border:none;
+  padding:10px 16px;
+  border-radius:8px;
+  color:#fff;
+  cursor:pointer;
+}
+
+button.danger{
+  background:var(--danger);
+}
+
+.modal{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.6);
+  display:none;
+  align-items:center;
+  justify-content:center;
+}
+
+.modal.active{display:flex}
+
+.modal-content{
+  background:var(--panel);
+  padding:24px;
+  border-radius:12px;
+  width:90%;
+  max-width:400px;
+}
+</style>
 </head>
 
-<body class="bg-background text-white font-display overflow-hidden">
+<body>
+<div class="app">
 
-<div class="flex h-screen">
+<aside>
+  <h1>✔ HabitFlow</h1>
+  <nav>
+    <a class="active">Dashboard</a>
+  </nav>
+</aside>
 
-  <!-- SIDEBAR -->
-  <aside class="w-64 bg-surface border-r border-borderc p-6 hidden md:flex flex-col">
-    <h1 class="text-2xl font-bold mb-8">HabitFlow</h1>
-    <nav class="flex flex-col gap-3 text-gray-400">
-      <span class="text-primary font-bold">Dashboard</span>
-      <span>Habits</span>
-      <span>Calendar</span>
-      <span>Settings</span>
-    </nav>
-  </aside>
+<main>
+  <h1>Dashboard</h1>
 
-  <!-- MAIN -->
-  <main class="flex-1 overflow-y-auto p-8 space-y-8">
+  <div class="stats">
+    <div class="stat"><h2 id="completionRate">0%</h2><p>Completion</p></div>
+    <div class="stat"><h2 id="bestStreak">0</h2><p>Best Streak</p></div>
+    <div class="stat"><h2 id="totalHabits">0</h2><p>Total Habits</p></div>
+    <div class="stat"><h2 id="doneToday">0</h2><p>Done Today</p></div>
+  </div>
 
-    <!-- HEADER -->
-    <div class="flex justify-between items-center">
-      <h2 class="text-3xl font-bold">Overview</h2>
-      <span id="dateDisplay" class="text-gray-400"></span>
+  <div class="grid">
+    <div class="card">
+      <canvas id="chart" height="120"></canvas>
     </div>
 
-    <!-- METRICS -->
-    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-      <div class="bg-surface p-4 rounded-xl">
-        <p class="text-gray-400 text-sm">Completion Rate</p>
-        <p id="completionRate" class="text-3xl font-bold">0%</p>
-      </div>
-      <div class="bg-surface p-4 rounded-xl">
-        <p class="text-gray-400 text-sm">Current Streak</p>
-        <p id="streakCounter" class="text-3xl font-bold">🔥 0</p>
-      </div>
-      <div class="bg-surface p-4 rounded-xl">
-        <p class="text-gray-400 text-sm">Total Habits</p>
-        <p id="totalHabits" class="text-3xl font-bold">0</p>
-      </div>
-      <div class="bg-surface p-4 rounded-xl">
-        <p class="text-gray-400 text-sm">Avg / Day</p>
-        <p id="avgHabits" class="text-3xl font-bold">0</p>
-      </div>
+    <div class="card">
+      <button onclick="openModal()">+ New Habit</button>
+      <div id="habitList" style="margin-top:16px"></div>
     </div>
+  </div>
+</main>
 
-    <!-- CHART -->
-    <div class="bg-surface p-6 rounded-2xl">
-      <h3 class="font-bold mb-4">Progress (Last 7 Days)</h3>
-      <div class="h-[300px]">
-        <canvas id="progressChart"></canvas>
-      </div>
-    </div>
-
-    <!-- HABITS -->
-    <div class="bg-surface p-6 rounded-2xl">
-      <div class="flex justify-between items-center mb-4">
-        <h3 id="journalTitle" class="font-bold text-xl">Today's Habits</h3>
-        <button id="addHabitBtn" class="bg-primary text-black px-4 py-2 rounded-lg font-bold">Add Habit</button>
-      </div>
-      <ul id="habitList" class="space-y-3"></ul>
-    </div>
-
-    <!-- CALENDAR -->
-    <div class="bg-surface p-6 rounded-2xl">
-      <div class="flex justify-between items-center mb-4">
-        <button id="prevMonth">◀</button>
-        <span id="currentMonth"></span>
-        <button id="nextMonth">▶</button>
-      </div>
-      <div id="calendarGrid" class="grid grid-cols-7 gap-2"></div>
-    </div>
-
-  </main>
 </div>
 
-<!-- FLOATING ADD -->
-<button id="floatingAddBtn"
-  class="fixed bottom-8 right-8 bg-primary text-black w-16 h-16 rounded-full text-3xl font-bold">+</button>
-
-<!-- ADD HABIT MODAL -->
-<div id="addHabitModal" class="fixed inset-0 bg-black/60 hidden items-center justify-center">
-  <form id="addHabitForm" class="bg-surface p-6 rounded-xl space-y-4 w-96">
-    <h3 class="font-bold text-xl">Add Habit</h3>
-    <input id="habitName" required class="w-full p-2 bg-black rounded" placeholder="Habit name"/>
-    <textarea id="habitDescription" class="w-full p-2 bg-black rounded" placeholder="Description"></textarea>
-    <select id="habitFrequency" class="w-full p-2 bg-black rounded">
-      <option value="daily">Daily</option>
-      <option value="weekly">Weekly</option>
-    </select>
-    <button class="bg-primary text-black w-full py-2 font-bold rounded">Save</button>
-  </form>
-</div>
-
-<!-- DELETE MODAL -->
-<div id="deleteModal" class="fixed inset-0 bg-black/60 hidden items-center justify-center">
-  <div class="bg-surface p-6 rounded-xl w-96 space-y-4">
-    <p>Delete <span id="deleteHabitName"></span>?</p>
-    <button id="confirmDeleteBtn" class="bg-red-500 w-full py-2 rounded">Delete</button>
-    <button id="cancelDeleteBtn" class="w-full py-2">Cancel</button>
+<!-- MODAL -->
+<div class="modal" id="modal">
+  <div class="modal-content">
+    <h2>Add Habit</h2>
+    <form onsubmit="submitHabit(event)">
+      <input required placeholder="Habit name" id="hName" style="width:100%;padding:10px"><br><br>
+      <textarea placeholder="Description" id="hDesc" style="width:100%;padding:10px"></textarea><br><br>
+      <button>Add</button>
+    </form>
   </div>
 </div>
 
-<!-- TOAST -->
-<div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-surface px-6 py-3 rounded hidden"></div>
-
 <script>
-/* ===============================
-   SUPABASE
-================================ */
-const supabase = window.supabase.createClient(
-  "https://jtpsnufycomhozsiegjh.supabase.co",
-  "YOUR_PUBLIC_ANON_KEY"
-);
+/* =========================
+   STATE + STORAGE (OLD LOGIC)
+========================= */
 
-/* ===============================
-   DOM
-================================ */
-const addHabitBtn = document.getElementById("addHabitBtn");
-const floatingAddBtn = document.getElementById("floatingAddBtn");
-const addHabitModal = document.getElementById("addHabitModal");
-const addHabitForm = document.getElementById("addHabitForm");
-const habitList = document.getElementById("habitList");
-const dateDisplay = document.getElementById("dateDisplay");
-const journalTitle = document.getElementById("journalTitle");
+const HABITS_KEY = 'hf_habits';
+const ENTRIES_KEY = 'hf_entries';
 
-const calendarGrid = document.getElementById("calendarGrid");
-const currentMonth = document.getElementById("currentMonth");
-const prevMonth = document.getElementById("prevMonth");
-const nextMonth = document.getElementById("nextMonth");
+const store = {
+  habits: [],
+  entries: [],
+  date: new Date()
+};
 
-const deleteModal = document.getElementById("deleteModal");
-const deleteHabitName = document.getElementById("deleteHabitName");
-const confirmDeleteBtn = document.getElementById("confirmDeleteBtn");
-const cancelDeleteBtn = document.getElementById("cancelDeleteBtn");
+const Service = {
+  init(){
+    store.habits = JSON.parse(localStorage.getItem(HABITS_KEY)) || [];
+    store.entries = JSON.parse(localStorage.getItem(ENTRIES_KEY)) || [];
+    render();
+  },
 
-/* ===============================
-   STATE
-================================ */
-let habits = [];
-let habitEntries = [];
-let selectedDate = new Date();
-let currentMonthDate = new Date();
-let habitToDelete = null;
-let progressChart = null;
+  save(){
+    localStorage.setItem(HABITS_KEY,JSON.stringify(store.habits));
+    localStorage.setItem(ENTRIES_KEY,JSON.stringify(store.entries));
+  },
 
-/* ===============================
-   INIT
-================================ */
-document.addEventListener("DOMContentLoaded", async () => {
-  updateDateDisplay();
-  renderCalendar();
-  await loadData();
-});
+  addHabit(name,desc){
+    store.habits.push({
+      id:crypto.randomUUID(),
+      name,desc,
+      created:new Date().toISOString(),
+      streak:0
+    });
+    this.save(); render();
+  },
 
-/* ===============================
-   DATE
-================================ */
-function updateDateDisplay() {
-  dateDisplay.textContent = selectedDate.toDateString();
-  journalTitle.textContent =
-    selectedDate.toDateString() === new Date().toDateString()
-      ? "Today's Habits"
-      : `Habits for ${selectedDate.toDateString()}`;
-}
+  toggle(hid){
+    const d = store.date.toISOString().split('T')[0];
+    let e = store.entries.find(x=>x.habitId===hid && x.date===d);
+    if(e){e.completed=!e.completed}
+    else store.entries.push({id:crypto.randomUUID(),habitId:hid,date:d,completed:true});
+    this.updateStreak(hid);
+    this.save(); render();
+  },
 
-/* ===============================
-   LOAD DATA
-================================ */
-async function loadData() {
-  const { data: h } = await supabase.from("habits").select("*").eq("active", true);
-  const { data: e } = await supabase.from("habit_entries").select("*");
-  habits = h || [];
-  habitEntries = e || [];
+  updateStreak(hid){
+    const h = store.habits.find(x=>x.id===hid);
+    let dates = store.entries.filter(e=>e.habitId===hid && e.completed).map(e=>e.date);
+    let d=new Date();d.setHours(0,0,0,0);
+    let s=0;
+    while(dates.includes(d.toISOString().split('T')[0])){
+      s++; d.setDate(d.getDate()-1);
+    }
+    h.streak=s;
+  }
+};
+
+/* =========================
+   UI RENDERING
+========================= */
+
+let chart;
+
+function render(){
   renderHabits();
-  updateAnalytics();
-  updateProgressChart();
+  renderStats();
+  renderChart();
 }
 
-/* ===============================
-   HABITS
-================================ */
-function renderHabits() {
-  habitList.innerHTML = "";
-  const dateStr = selectedDate.toISOString().split("T")[0];
-
-  habits.forEach(habit => {
-    const entry = habitEntries.find(e => e.habit_id === habit.id && e.date === dateStr);
-    const completed = entry?.completed || false;
-
-    const li = document.createElement("li");
-    li.className = "flex items-center gap-3 bg-black/30 p-3 rounded-lg";
-
-    li.innerHTML = `
-      <input type="checkbox" ${completed ? "checked" : ""} />
-      <span class="flex-1">${habit.name}</span>
-      <span>🔥 ${calculateStreak(habit.id)}</span>
-      <button class="text-red-400">✕</button>
+function renderHabits(){
+  const d = store.date.toISOString().split('T')[0];
+  const el = document.getElementById('habitList');
+  el.innerHTML='';
+  store.habits.forEach(h=>{
+    const done = store.entries.some(e=>e.habitId===h.id && e.date===d && e.completed);
+    const div=document.createElement('div');
+    div.className='habit'+(done?' done':'');
+    div.innerHTML=`
+      <input type="checkbox" ${done?'checked':''}>
+      <div style="flex:1">${h.name}<br><small>🔥 ${h.streak}</small></div>
     `;
-
-    li.querySelector("input").onchange = e =>
-      toggleHabitCompletion(habit.id, e.target.checked, dateStr);
-
-    li.querySelector("button").onclick = () => {
-      habitToDelete = habit;
-      deleteHabitName.textContent = habit.name;
-      deleteModal.classList.remove("hidden");
-    };
-
-    habitList.appendChild(li);
-  });
-
-  document.getElementById("totalHabits").textContent = habits.length;
-}
-
-/* ===============================
-   TOGGLE
-================================ */
-async function toggleHabitCompletion(habitId, completed, date) {
-  const { data: existing } = await supabase
-    .from("habit_entries")
-    .select("*")
-    .eq("habit_id", habitId)
-    .eq("date", date)
-    .single();
-
-  if (existing) {
-    await supabase.from("habit_entries").update({ completed }).eq("id", existing.id);
-  } else {
-    await supabase.from("habit_entries").insert([{ habit_id: habitId, date, completed }]);
-  }
-  loadData();
-}
-
-/* ===============================
-   STREAK
-================================ */
-function calculateStreak(habitId) {
-  const entries = habitEntries
-    .filter(e => e.habit_id === habitId && e.completed)
-    .sort((a, b) => new Date(b.date) - new Date(a.date));
-
-  let streak = 0;
-  let d = new Date(); d.setHours(0,0,0,0);
-
-  for (const e of entries) {
-    const ed = new Date(e.date); ed.setHours(0,0,0,0);
-    if ((d - ed) / 86400000 === streak) streak++;
-    else break;
-  }
-  return streak;
-}
-
-/* ===============================
-   ANALYTICS
-================================ */
-function updateAnalytics() {
-  const completed = habitEntries.filter(e => e.completed).length;
-  document.getElementById("completionRate").textContent =
-    habits.length ? Math.round((completed / (habits.length * 7)) * 100) + "%" : "0%";
-  document.getElementById("avgHabits").textContent =
-    completed ? (completed / 7).toFixed(1) : "0";
-
-  const streaks = habits.map(h => calculateStreak(h.id));
-  document.getElementById("streakCounter").textContent = "🔥 " + Math.max(...streaks, 0);
-}
-
-/* ===============================
-   CHART
-================================ */
-function updateProgressChart() {
-  const ctx = document.getElementById("progressChart");
-  if (progressChart) progressChart.destroy();
-
-  const labels = [];
-  const data = [];
-
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date(); d.setDate(d.getDate() - i);
-    const ds = d.toISOString().split("T")[0];
-    labels.push(d.toLocaleDateString("en-US", { weekday: "short" }));
-    data.push(habitEntries.filter(e => e.date === ds && e.completed).length);
-  }
-
-  progressChart = new Chart(ctx, {
-    type: "line",
-    data: { labels, datasets: [{ data, borderColor: "#19e65e", fill: true }] },
-    options: { plugins: { legend: { display: false } } }
+    div.querySelector('input').onchange=()=>Service.toggle(h.id);
+    el.appendChild(div);
   });
 }
 
-/* ===============================
-   CALENDAR
-================================ */
-function renderCalendar() {
-  calendarGrid.innerHTML = "";
-  currentMonth.textContent = currentMonthDate.toLocaleDateString("en-US", { month: "long", year: "numeric" });
-
-  const y = currentMonthDate.getFullYear();
-  const m = currentMonthDate.getMonth();
-  const first = new Date(y, m, 1).getDay();
-  const days = new Date(y, m + 1, 0).getDate();
-
-  for (let i = 0; i < first; i++) calendarGrid.appendChild(document.createElement("div"));
-
-  for (let d = 1; d <= days; d++) {
-    const el = document.createElement("div");
-    el.textContent = d;
-    el.className = "p-2 text-center rounded cursor-pointer hover:bg-primary/20";
-    el.onclick = () => {
-      selectedDate = new Date(y, m, d);
-      updateDateDisplay();
-      renderHabits();
-      renderCalendar();
-    };
-    calendarGrid.appendChild(el);
-  }
+function renderStats(){
+  const d = store.date.toISOString().split('T')[0];
+  const total=store.habits.length;
+  const done=store.entries.filter(e=>e.date===d && e.completed).length;
+  document.getElementById('totalHabits').textContent=total;
+  document.getElementById('doneToday').textContent=done;
+  document.getElementById('completionRate').textContent=total?Math.round(done/total*100)+'%':'0%';
+  document.getElementById('bestStreak').textContent=Math.max(0,...store.habits.map(h=>h.streak));
 }
 
-prevMonth.onclick = () => { currentMonthDate.setMonth(currentMonthDate.getMonth() - 1); renderCalendar(); };
-nextMonth.onclick = () => { currentMonthDate.setMonth(currentMonthDate.getMonth() + 1); renderCalendar(); };
+function renderChart(){
+  const labels=[],data=[];
+  for(let i=6;i>=0;i--){
+    const d=new Date();d.setDate(d.getDate()-i);
+    const ds=d.toISOString().split('T')[0];
+    labels.push(d.toLocaleDateString('en',{weekday:'short'}));
+    data.push(store.entries.filter(e=>e.date===ds && e.completed).length);
+  }
+  if(chart)chart.destroy();
+  chart=new Chart(document.getElementById('chart'),{
+    type:'line',
+    data:{labels,datasets:[{data,borderColor:'#4CAF50',fill:false}]},
+    options:{plugins:{legend:{display:false}}}
+  });
+}
 
-/* ===============================
-   MODALS
-================================ */
-addHabitBtn.onclick = floatingAddBtn.onclick = () =>
-  addHabitModal.classList.remove("hidden");
-
-addHabitForm.onsubmit = async e => {
+/* =========================
+   MODAL
+========================= */
+function openModal(){document.getElementById('modal').classList.add('active')}
+function submitHabit(e){
   e.preventDefault();
-  await supabase.from("habits").insert([{
-    name: habitName.value,
-    description: habitDescription.value,
-    frequency: habitFrequency.value,
-    active: true
-  }]);
-  addHabitModal.classList.add("hidden");
-  addHabitForm.reset();
-  loadData();
-};
+  Service.addHabit(hName.value,hDesc.value);
+  modal.classList.remove('active');
+  e.target.reset();
+}
 
-confirmDeleteBtn.onclick = async () => {
-  await supabase.from("habit_entries").delete().eq("habit_id", habitToDelete.id);
-  await supabase.from("habits").delete().eq("id", habitToDelete.id);
-  deleteModal.classList.add("hidden");
-  loadData();
-};
-
-cancelDeleteBtn.onclick = () => deleteModal.classList.add("hidden");
+/* =========================
+   INIT
+========================= */
+Service.init();
 </script>
 
 </body>
